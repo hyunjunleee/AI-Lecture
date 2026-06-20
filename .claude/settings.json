@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "claude-sonnet-4-6",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "disableBypassPermissionsMode": "disable",
+    "disableAutoMode": "disable",
+    "deny": [
+      "Write(spec/**)",
+      "Edit(spec/**)",
+      "Write(template/**)",
+      "Edit(template/**)",
+      "Write(.claude/**)",
+      "Edit(.claude/**)",
+      "Read(.env)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(secrets/**)",
+      "Read(work/secrets/**)",
+      "Read(output/secrets/**)",
+      "Read(**/*.pem)",
+      "Read(**/id_rsa)",
+      "mcp__*",
+      "Bash(rm *)",
+      "Bash(rmdir *)",
+      "Bash(mv *)",
+      "Bash(chmod *)",
+      "Bash(chown *)",
+      "Bash(sudo *)",
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(nc *)",
+      "Bash(scp *)",
+      "Bash(rsync *)",
+      "Bash(git push*)",
+      "Bash(gh *)",
+      "Bash(aws *)",
+      "Bash(kubectl *)",
+      "Bash(docker *)",
+      "Bash(node *)",
+      "Bash(ruby *)",
+      "Bash(perl *)",
+      "Bash(sh *)",
+      "Bash(bash *)"
+    ],
+    "ask": [
+      "Bash(git *)"
+    ],
+    "allow": [
+      "Agent(researcher)",
+      "Agent(theory-curator)",
+      "Agent(literature-gate)",
+      "Agent(tex-writer)",
+      "Agent(typeset-checker)",
+      "Agent(mathematician-gate)",
+      "Read(spec/**)",
+      "Read(template/**)",
+      "Read(work/**)",
+      "Read(output/**)",
+      "Glob",
+      "Grep",
+      "WebSearch",
+      "WebFetch(domain:*)",
+      "Write(work/lecture*_research*.md)",
+      "Write(work/lecture*_theory*.md)",
+      "Write(output/literature_gate_*.jsonl)",
+      "Write(output/gate_log_*.jsonl)",
+      "Write(output/lecture*.tex)",
+      "Edit(output/lecture*.tex)",
+      "Write(output/typeset_check_*.md)",
+      "Write(output/final_pdftotext_check_*.md)",
+      "Bash(xelatex *)",
+      "Bash(pdftotext *)",
+      "Bash(pdftoppm *)",
+      "Bash(grep *)",
+      "Bash(mkdir *)",
+      "Bash(tail *)",
+      "Bash(ls *)",
+      "Bash(wc *)",
+      "Bash(sha256sum *)",
+      "Bash(cp output/build/*/lecture*.pdf output/lecture*.pdf)",
+      "Bash(cp output/build/*/lecture*.log output/lecture*.log)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/pipeline_policy.py"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,231 @@
+% =====================================================================
+%  AI 28강 — 강의 템플릿 (lecture_template.tex)
+%  컴파일:  xelatex -shell-escape lectureNN.tex   (반드시 2회)
+%  의존성:  Pygments(pygmentize), minted, fvextra, tcolorbox, Noto CJK
+%  자세한 규격은 AI28_강의제작_사양서_v13.md 참조.
+%  v13: 무대/가정/표기/비고 환경·computebox(계산 선언) 추가.
+%       아래 ①–④ 골격은 *비강제 예시*다 — 섹션 구성·순서·개수는 사양서 §0.0-2에 따라 자유.
+% =====================================================================
+\documentclass[11pt]{article}
+
+% ---------- 엔진/폰트 (xelatex) ----------
+\usepackage{fontspec}
+\setmainfont{Noto Serif CJK KR}[Script=Hangul]
+\setsansfont{Noto Sans CJK KR}[Script=Hangul]
+\setmonofont{Noto Sans Mono CJK KR}[Scale=0.88]
+
+% ---------- 수학 ----------
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{bm}
+
+% ---------- 레이아웃 ----------
+\usepackage[a4paper,top=2.4cm,bottom=2.4cm,left=2.4cm,right=2.4cm]{geometry}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage[most]{tcolorbox}
+\usepackage[outputdir=.]{minted}   % 코드 하이라이트 (CJK 안전). -shell-escape 필요.
+\usepackage{booktabs}
+\usepackage{caption}               % \caption* 의 유령 라벨 방지 (필수)
+\usepackage[hidelinks]{hyperref}
+
+% ---------- 색상 팔레트 ----------
+\definecolor{primary}{HTML}{1F3A5F}     % 딥 네이비
+\definecolor{accent}{HTML}{B7472A}      % 벽돌색
+\definecolor{soft}{HTML}{EEF2F7}        % 연한 배경
+\definecolor{rule}{HTML}{C9D3DF}
+\definecolor{codebg}{HTML}{F7F8FA}
+\definecolor{ln}{HTML}{9AA6B2}
+
+% ---------- 헤더/푸터 ----------
+\pagestyle{fancy}
+\fancyhf{}
+\setlength{\headheight}{14pt}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{rule}\leaders\hrule height \headrulewidth\hfill}}
+\fancyhead[L]{\footnotesize\sffamily\color{primary}AI 28강 · Part\,\textbf{?}}     % TODO: Part 번호
+\fancyhead[R]{\footnotesize\sffamily\color{primary}제\textbf{N}강 · \textbf{제목}} % TODO
+\fancyfoot[C]{\thepage}
+
+% ---------- 섹션 스타일 ----------
+\titleformat{\section}
+  {\sffamily\Large\bfseries\color{primary}}
+  {\thesection}{0.6em}{}[{\color{rule}\titlerule[0.8pt]}]
+\titleformat{\subsection}
+  {\sffamily\large\bfseries\color{primary!88!black}}
+  {\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{1.5em}{0.6em}
+\titlespacing*{\subsection}{0pt}{1.1em}{0.4em}
+% 주의: \subsection 제목에 "1.1\quad" 같은 수동 번호를 넣지 말 것 (중복 번호 발생).
+
+% ---------- 한글 줄바꿈(어절 단위) 여유 ----------
+\tolerance=3000
+\emergencystretch=3.2em
+\hbadness=4000
+
+% ---------- 정리/정의 환경 ----------
+\theoremstyle{plain}
+\newtheorem{theorem}{정리}
+\newtheorem{lemma}{보조정리}
+\newtheorem{proposition}{명제}
+\theoremstyle{definition}
+\newtheorem{definition}{정의}
+\newtheorem{assumption}{가정}          % 상시/국소 가정 (사양서 §2.6A-1)
+\newtheorem*{notation}{표기}           % 표기 바인딩 (사양서 §0.0-A·§2.11-9)
+\newtheorem*{stage}{무대}              % 수학적 무대의 단일 조립 (사양서 §2.6A — 존재 의무, 배치 자유)
+\theoremstyle{remark}
+\newtheorem*{remark}{비고}             % 범위 진술 등 (사양서 §2.6 권장 형식)
+\renewcommand{\proofname}{\textbf{증명}}
+\renewcommand{\qedsymbol}{$\blacksquare$}
+
+% ---------- 코드 스타일 (minted + 분할 가능한 박스) ----------
+\renewcommand{\theFancyVerbLine}{\tiny\color{ln}\arabic{FancyVerbLine}}
+\setminted{fontsize=\footnotesize, linenos, numbersep=7pt,
+  breaklines=true, breakanywhere=false, style=friendly, autogobble=false}
+\newtcolorbox{codebox}{
+  enhanced, breakable, colback=codebg, frame hidden,
+  borderline west={1.2pt}{0pt}{primary!65},
+  left=12pt, right=4pt, top=4pt, bottom=4pt, arc=1pt, boxsep=2pt,
+  before skip=0.8em, after skip=0.4em,
+}
+
+% ---------- 강조 박스 (메타 교훈 / 직관) ----------
+\newtcolorbox{keybox}[1][핵심]{
+  enhanced, breakable, colback=soft, colframe=primary,
+  boxrule=0.6pt, arc=2pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries\color{white},
+  coltitle=white, title=#1, attach boxed title to top left={xshift=8pt,yshift=-2pt},
+  boxed title style={colback=primary, arc=1pt, boxrule=0pt}
+}
+
+% ---------- 계산 선언 박스 (사양서 §2.16 — display 2줄 이상 전개 직전) ----------
+% 사용 예:
+%   \begin{computebox}
+%     \textbf{대상.} ...  \textbf{연산.} ...  \textbf{목적.} ...  \textbf{적법성.} ...
+%   \end{computebox}
+% 4요소의 '존재와 판정 가능성'이 의무이며, 박스 대신 산문 2–3문장·정리 진술 일부로 써도 된다.
+\newtcolorbox{computebox}[1][계산 선언]{
+  enhanced, breakable, colback=white, colframe=rule,
+  boxrule=0.5pt, arc=1.5pt, left=8pt, right=8pt, top=6pt, bottom=6pt,
+  fonttitle=\sffamily\bfseries\small,
+  coltitle=primary, title=#1, attach boxed title to top left={xshift=8pt,yshift=-2pt},
+  boxed title style={colback=white, colframe=rule, boxrule=0.5pt, arc=1pt}
+}
+
+% ---------- 인라인 코드 ----------
+\newcommand{\code}[1]{\textcolor{primary!80!black}{\texttt{#1}}}
+
+\setlength{\parskip}{0.45em}
+\setlength{\parindent}{0pt}
+
+% =====================================================================
+\begin{document}
+
+% ---------- 표지 블록 ----------
+\begin{center}
+  {\sffamily\small\color{accent}\textbf{AI 기술의 역사와 현재 — 28강 심화 커리큘럼}}\\[2pt]
+  {\sffamily\Huge\bfseries\color{primary}제N강. 제목}\\[10pt]
+  {\large Part ? — 부제 \;|\; 대상 수준: 고급 \;|\; 2026년}
+\end{center}
+\vspace{0.4em}{\color{rule}\rule{\linewidth}{0.8pt}}\vspace{0.4em}
+
+\begin{keybox}[이 강의를 읽는 법]
+본 강의는 이론·수식 유도·추천 문헌·코드 실습의 콘텐츠를 모두 담되, 그 구성·순서는
+무정지 순차 독해(사양서 \S0.0)를 위해 자유롭게 설계되었다. 이 강의의 목표는 \textbf{...} 이다.
+\end{keybox}
+
+% ---------- 무대 (사양서 §2.6A — 존재 의무·배치 자유; 초안 단계에서 먼저 세울 것) ----------
+\begin{stage}
+이 강의의 무대: (해당 시) 확률공간 $(\Omega,\mathcal F,\mathbb P)$와 필트레이션; 모든 기본 공간과
+그 구조($\sigma$-대수/위상/노름/내적/차원); 기본 사상들의 정의역·공역·정칙성; 상시 가정.
+제0강 표준 무대 $S_0$의 재사용은 한 줄 회상+포인터로 이 블록 안에 포함한다(\S2.11-5).
+% 유한·이산이면 한 줄 정착 가능: "σ-대수는 멱집합, 밀도는 계수측도에 대한 pmf" (§2.6A-4)
+\end{stage}
+
+% ============ 본문 섹션들 — 아래 ①–④는 비강제 *예시 골격*이다(사양서 §0.0-2) ============
+% 구성·순서·개수는 무정지 순차 독해만 만족하면 자유. 특히 서사 절이 수식 유도 절보다
+% 앞설 때, 그 서사에 등장하는 모든 기호·술어는 그 지점 이전에 정의·무대 부착되어야 한다(§0.0-A).
+% ====================== ① 이론 ======================
+\section{이론 — ...}
+본문(인과 중심 서사). % 주의: 어떤 인라인 수식·기호·술어도 사용 전에 정의·무대 부착(§0.0-A·§2.6A·§2.11-9).
+
+\subsection{소제목}
+% (수동 번호 금지: 자동으로 1.1 이 붙는다)
+
+\begin{keybox}[메타 교훈]
+...
+\end{keybox}
+
+% ====================== ② 수식 유도 ======================
+\section{수식 유도}
+
+\begin{definition}[이름]
+...정의...
+\[ \text{수식} \]
+\end{definition}
+
+\begin{theorem}[이름]
+...정리 서술...
+\end{theorem}
+
+\begin{proof}
+...완전한 증명... \qedhere
+\end{proof}
+
+\begin{computebox}
+\textbf{대상.} ...(무대의 어느 공간의 어떤 원소/사상의 어떤 양인가)\;
+\textbf{연산.} ...(가할 연산과 그 정의 전제)\;
+\textbf{목적.} ...(이 계산이 산출할 것과 지금 필요한 이유)\;
+\textbf{적법성.} ...(교환·정칙성 의존 단계의 근거 — 없으면 '없음')
+\end{computebox}
+
+\begin{keybox}[직관]
+...
+\end{keybox}
+
+% ====================== ③ 추천 논문 ======================
+\section{추천 논문 / 자료}
+원전을 직접 읽는 것을 전제로, 각 논문의 기여와 읽기 포인트를 정리한다.
+% 원문 인용 금지 — 모두 자기 표현으로.
+
+\begin{enumerate}[leftmargin=1.4em]
+  \item \textbf{저자(연도), 제목.}\\ 기여. 읽기 포인트: ...
+\end{enumerate}
+
+% ====================== ④ 코드 실습 ======================
+\section{코드 실습 — \texorpdfstring{\code{labNN\_name.py}}{labNN\_name.py}}
+
+\textbf{과제.}\; ...
+
+\subsection{블록 제목}
+\begin{codebox}\inputminted[firstline=27, lastline=60, firstnumber=27]{python}{labNN_name.py}\end{codebox}
+
+\textbf{\code{함수명(...)}} — 입력은 ..., 출력은 ..., 핵심 로직은 ..., 수식 대응은 ....
+
+% (블록 반복: firstline/lastline 을 함수 경계에 맞춰 조정)
+
+\subsection{실행 결과}
+\code{python labNN\_name.py}의 실제 출력:
+
+\begin{tcolorbox}[colback=black!92, colframe=black!92, arc=2pt,
+  fontupper=\scriptsize\ttfamily\color{white}, left=8pt,right=8pt,top=6pt,bottom=6pt]
+[실측 콘솔 출력을 그대로 붙인다]\\
+줄바꿈은 \textbackslash\textbackslash, 특수문자는 이스케이프.
+\end{tcolorbox}
+
+\begin{figure}[h]\centering
+  \includegraphics[width=\linewidth]{labNN_name.png}
+  \caption*{\small\textbf{그림 1.} ...설명...}
+\end{figure}
+
+\subsection{결과 해석}
+...
+
+\vspace{0.6em}{\color{rule}\rule{\linewidth}{0.8pt}}\\[3pt]
+{\small\sffamily\color{primary}\textbf{다음 강 예고 — (N+1)강. 제목.}}
+{\small ...}
+
+\end{document}
