@@ -126,7 +126,14 @@ grep -nE "§[0-9]+\.[0-9]+[A-Za-z]" output/lectureNN.txt
 grep -nE "§[0-9]+\.[0-9]+-[0-9A-Za-z]" output/lectureNN.txt
 grep -nE "§0\.0" output/lectureNN.txt
 grep -nE "S[0-9]+-C[0-9]+" output/lectureNN.txt
+grep -nF "문헌 의존성" output/lectureNN.txt
+grep -nF "강의를 읽는 법" output/lectureNN.txt
+grep -nF "강의 내부" output/lectureNN.txt
+grep -nF "black-box" output/lectureNN.txt
+grep -nF "epistemic" output/lectureNN.txt
 ```
+
+`문헌 의존성`·`강의를 읽는 법`·`강의 내부`·`black-box`·`epistemic` grep은 **메타-서술 잔류**를 본다 — 독자 몰입을 깨는 저자 작업노트·커리큘럼 라벨은 본문에서 100% 제거되어야 한다(tex-writer §5A-8). 렌더 `.txt`에 하나라도 매치되면 **FAIL**, repair_channel=tex-writer(해당 라벨·박스를 제거하고 그 내용은 인라인 산문으로 흡수). 출처 귀속은 본문 산문 속 `[n]` 인라인 인용으로 살아 있어야 정상이다.
 
 마지막 `S[0-9]+-C[0-9]+` grep은 theory dossier 내부 식별자(claim_id, 예 `S1-C1`)가 독자용 텍스트에 새어들었는지 본다. 렌더된 `.txt`에는 LaTeX 주석(`% source_claim: ...`)이 들어가지 않으므로, `.txt`에서 `S<숫자>-C<숫자>`가 매치되면 그것은 **독자에게 보이는 누출**이다(remark에 `[n]` 인용 대신 raw claim_id를 쓴 경우) → **FAIL**, repair_channel=tex-writer. 정상적으로는 독자는 `[2]` 같은 인용번호만 보고 claim_id는 주석에만 있어야 한다.
 
@@ -167,6 +174,7 @@ sha256sum output/lectureNN.txt
 - label 중복:
 - 사양서 절 표시 누출(§2.6A-5 류): (매치 줄·표시 또는 "없음")
 - 내부 claim_id 누출(S1-C1 류, .txt 기준): (매치 줄·표시 또는 "없음")
+- 메타-서술 잔류(문헌 의존성/강의를 읽는 법/강의 내부/black-box/epistemic): (매치 줄·표시 또는 "없음")
 
 ## 2. 컴파일
 - build dir: output/build/lectureNN_roundRR
@@ -210,6 +218,11 @@ grep -nE "§[0-9]+\.[0-9]+[A-Za-z]" output/lectureNN_final.txt
 grep -nE "§[0-9]+\.[0-9]+-[0-9A-Za-z]" output/lectureNN_final.txt
 grep -nE "§0\.0" output/lectureNN_final.txt
 grep -nE "S[0-9]+-C[0-9]+" output/lectureNN_final.txt
+grep -nF "문헌 의존성" output/lectureNN_final.txt
+grep -nF "강의를 읽는 법" output/lectureNN_final.txt
+grep -nF "강의 내부" output/lectureNN_final.txt
+grep -nF "black-box" output/lectureNN_final.txt
+grep -nF "epistemic" output/lectureNN_final.txt
 sha256sum output/lectureNN.pdf
 sha256sum output/lectureNN_final.txt
 sha256sum output/lectureNN.tex
@@ -218,9 +231,9 @@ sha256sum output/gate_log_NN.jsonl
 sha256sum output/literature_gate_NN.jsonl
 ```
 
-주요 절 제목, theorem/definition/stage/computebox 제목, source dependency remark가 추출되는지 `output/lectureNN_final.txt`를 읽고 확인한다.
+주요 절 제목, 정의/정리/명제 제목, source dependency remark가 추출되는지 `output/lectureNN_final.txt`를 읽고 확인한다.
 
-위 사양서 절 표시 누출 grep 3종 또는 내부 claim_id 누출 grep(`S[0-9]+-C[0-9]+`) 중 하나라도 매치되면 final 판정도 **FAIL**(매치 줄·표시 보고, `tex-writer` 수정 필요).
+위 사양서 절 표시 누출 grep 3종, 내부 claim_id 누출 grep(`S[0-9]+-C[0-9]+`), 또는 메타-서술 잔류 grep(`문헌 의존성`·`강의를 읽는 법`·`강의 내부`·`black-box`·`epistemic`) 중 하나라도 매치되면 final 판정도 **FAIL**(매치 줄·표시 보고, `tex-writer` 수정 필요).
 
 ## 7. Final mode 산출물
 
@@ -247,10 +260,11 @@ sha256sum output/literature_gate_NN.jsonl
 - replacement character 없음:
 - 사양서 절 표시 누출 없음(§2.6A-5 류):
 - 내부 claim_id 누출 없음(S1-C1 류):
+- 메타-서술 잔류 없음(문헌 의존성/black-box/epistemic 등):
 
 ## 3. 구조 추출
 - 주요 절 제목:
-- theorem/definition/stage/computebox 제목:
+- 정의/정리/명제 제목:
 - source dependency remark:
 
 ## 4. 종합 판정

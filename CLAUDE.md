@@ -409,7 +409,7 @@ output/final_pdftotext_check_NN.md
 4. "Undefined" 없음
 5. replacement character � 없음
 6. 주요 절 제목 추출 가능
-7. theorem/definition/stage/computebox 제목 추출 가능
+7. 주요 정의·정리·명제 제목 추출 가능
 8. 한글 문자가 사라지지 않았는지 확인
 9. load-bearing source dependency remark가 의도한 경우 PDF 텍스트에 나타나는지 확인
 10. final txt, pdf, tex, theory, latest gate log digest 기록
@@ -450,9 +450,10 @@ E. final pdftotext gate PASS
 - 논문 장문 직접 인용 금지. 짧은 식별용 anchor만 허용.
 - 관련 문헌 나열과 역사적 맥락은 `research.md`를 근거로 쓸 수 있다.
 - formal claim은 `theory.md`의 `claim_id`를 가져야 한다.
-- load-bearing 외부 claim은 comment-only source tag로 충분하지 않다. 독자에게 보이는 source dependency remark 또는 macro가 필요하다.
-- **독자에게 보이는 부분은 실제 서지 인용이어야 한다** — `\cite{key}`로 참고문헌 항목을 가리켜 `[n]` 번호 + 저자·연도로 렌더한다(사양서 §2.8 author-year 정책). theory dossier의 내부 식별자(`S1-C1` 같은 `source_id-claim_id`)는 **독자에게 노출하지 않는다**. 그 claim_id는 기계 추적용 LaTeX 주석(`% source_claim: S1-C1`)으로만 남긴다. 즉 독자는 `[n]`(저자, 연도)를 보고, 게이트는 주석의 `Sx-Cy`로 추적한다.
+- load-bearing 외부 claim은 comment-only source tag로 충분하지 않다. 독자에게 보이는 출처 귀속이 필요하다 — **단, 별도 `비고[문헌 의존성]` 메타 박스가 아니라 본문 산문에 녹인 인라인 인용**으로 한다(교과서 방식, tex-writer §5A-8).
+- **독자에게 보이는 출처는 본문 문장 속 실제 서지 인용** — `\cite{key}`로 참고문헌 항목을 가리켜 `[n]` 번호 + 저자·연도로 렌더한다(사양서 §2.8 author-year 정책). theory dossier의 내부 식별자(`S1-C1` 같은 `source_id-claim_id`)는 **독자에게 노출하지 않는다**. 그 claim_id는 기계 추적용 LaTeX 주석(`% source_claim: S1-C1`)으로만 남긴다. 즉 독자는 본문 산문 속 `[n]`(저자, 연도)를 보고, 게이트는 주석의 `Sx-Cy`로 추적한다.
 - `S<숫자>-C<숫자>` 같은 내부 claim_id나 사양서 절 표시(§2.6A-5 류)가 독자용 본문·remark 제목에 나타나면 안 된다(누출). typeset-checker가 기계 검출, mathematician-gate가 의미 검출한다.
+- **본문은 대학 전공 수학 교과서의 연속 산문이다.** 강의노트·슬라이드식 파편화, 개조식 나열(키워드 박스), 메타-서술 라벨(`비고[문헌 의존성]`·"black-box"·`[epistemic:]`·"강의 내부 논증") 금지. 새 장·절·정리는 직전 한계→도입 필요성을 잇는 **도입 브릿지 산문**으로 시작하고, 출처는 본문 문장 속 **인라인 인용**으로 녹인다. 메타 라벨이 담던 *내용*(귀속·증명생략·경험적 표시)은 자연스러운 문장으로 흡수한다. tex-writer §5A 작성, mathematician-gate §6.7·typeset-checker 메타 grep가 QA. (사양서 §2.6A "형식 자유"와 양립 — 형식만 바꾸고 내용 의무는 유지.)
 - **개념 도입 근거는 빠뜨리지 않되 지어내지 않는다.** 각 핵심 개념·결과는 ① 필연성·동기(직전 한계 → 왜 필요), ② 앞 개념·대안 대비 비교·트레이드오프(기준·측정 양), ③ 유의성(왜 중요한 결과)을 *근거(본문 유도 또는 인용) 있게* 담는다. 체인: researcher 수집 → theory-curator 정착(§5 도입 근거 표) → tex-writer 작성(§6.2, 본문 유도/인용 없는 주장 금지) → mathematician-gate(§6.1a) 무근거 주장 멈춤 + literature-gate 비교·성능·유의성 주장 fidelity 감사. 근거가 없으면 자의로 채우지 말고 tex-writer가 escalation(§5.5).
 
 ---
