@@ -102,13 +102,16 @@ JSON의 `inputs` 필드에 path와 sha256을 정확히 기록한다. hook이 현
 
 ```text
 논문명, 저자명, 연도, model/result 이름, theorem/proposition/lemma 참조,
-"보였다", "증명했다", "보장한다", "수렴한다", "근사한다" 등 source 의존 문장
+"보였다", "증명했다", "보장한다", "수렴한다", "근사한다" 등 source 의존 문장,
+도입 동기·비교·유의성 주장("…보다 효율적/우월하다", "…때문에 등장", "중요한 결과다")
 ```
+
+도입 동기·비교·성능·유의성 주장은 대개 empirical이다 — source가 실제로 그 비교(대상·측정 양·조건)를 보였는지, theorem으로 과장 승격하지 않았는지, empirical 라벨이 유지됐는지 확인한다.
 
 각 문장에 대해 확인한다.
 
-1. load-bearing formal claim이면 독자에게 보이는 source dependency remark 또는 macro가 있는가?
-2. claim_id가 theory.md에 존재하는가?
+1. load-bearing formal claim이면 독자에게 보이는 source dependency remark 또는 macro가 있는가? 그 remark의 **독자 가시 부분이 실제 서지 인용**(`\cite{}`→`[n]`, 저자·연도)인가? 내부 식별자 `S<숫자>-C<숫자>`(claim_id)나 사양서 절 표시(§2.6A-5 류)가 **독자 가시 텍스트**(remark 제목·본문)에 노출되면 stall(`fidelity_axis: reader_visible_source_notes`, repair_channel `tex-writer`). claim_id는 `% source_claim:` 주석으로만 허용된다.
+2. claim_id가 theory.md에 존재하는가? (주석 `% source_claim: S?-C?`로 추적)
 3. lecture.tex의 조건이 theory.md의 required conditions보다 약하지 않은가?
 4. lecture.tex의 결론이 theory.md의 conclusion보다 강하지 않은가?
 5. `non-entailments`를 위반하지 않는가?

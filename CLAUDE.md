@@ -29,10 +29,12 @@ subagent tools
 
 ```text
 literature-gate     = 원문 ↔ theory.md ↔ lecture.tex source-fidelity 감사
-mathematician-gate  = lecture.tex 내부 수학 전수 감사
+mathematician-gate  = lecture.tex 내부 수학 전수 감사 (백지상태, tex+자기 로그만)
 ```
 
-`mathematician-gate`는 웹 검색으로 자신의 멈춤을 해소하지 않는다. 문헌 원문 확인은 `literature-gate` 또는 `researcher`/`theory-curator` 쪽으로 보낸다.
+`mathematician-gate`는 **백지상태 순수수학자**다. `output/lectureNN.tex`와 자기 gate log 외에는 아무것도 읽지 못한다(theory.md·typeset report·spec·다른 로그 전부 hook 차단). 매 iteration 백지상태에서 `.tex`를 순차 독해하며 멈추는 지점을 새로 탐색하고, **모든 stall을 `repair_channel=tex-writer`로만 보낸다**. 웹 검색하지 않는다.
+
+추가 자료조사·theory 보강이 필요한지의 **판단은 항상 `tex-writer`가 한다**. tex-writer가 math/literature stall을 받아 ① 내부 보강으로 해결하거나 ② `theory-curator`/`researcher`에 escalation 요청을 낸다(§5.5). 즉 자료조사 진입점은 tex-writer 단일화다.
 
 ---
 
@@ -45,7 +47,7 @@ mathematician-gate  = lecture.tex 내부 수학 전수 감사
 | `literature-gate` | opus | 원문-source fidelity 감사 | `output/literature_gate_NN.jsonl` | 예 | hash-only |
 | `tex-writer` | sonnet | `theory.md` 기반 LaTeX 집필·재집필 | `output/lectureNN.tex` | 아니오 | 아니오 |
 | `typeset-checker` | haiku | 기계적 조판·컴파일·pdftotext·preview | `output/typeset_check_NN.md`, pdf/txt | 아니오 | 제한적 |
-| `mathematician-gate` | opus | 내부 수학 전수 감사 | `output/gate_log_NN.jsonl` | 아니오 | hash-only |
+| `mathematician-gate` | opus | 내부 수학 전수 감사 (백지상태; tex+자기 로그만, 매 iter 순차 재독해) | `output/gate_log_NN.jsonl` | 아니오 | hash-only |
 
 ### 1.1 Agent별 파일 소유권
 
@@ -187,6 +189,25 @@ tex-writer contract
 
 문구 blacklist를 쓰지 않는다. 대신 의미적 경계를 둔다. 예: “existence result를 training guarantee로 강화하지 않는다.”
 
+#### 4.2.1 proof skeleton은 재구성 가능할 만큼 상세해야 한다 (강화)
+
+`proof skeleton provenance` 한 줄 요약으로는 부족하다. 각 proof-usable / theorem-usable claim card는 **그 카드만 읽고 tex-writer가 증명을 자의적 보충 없이 재구성할 수 있을 만큼** 원 논문·교재·강의자료의 증명을 상세히 옮겨야 한다. 최소 요구:
+
+```text
+- 증명 전략의 한 줄 요약 (무엇을 무엇으로 환원하는가)
+- 번호가 매겨진 단계 목록 (각 단계: 가정/입력 → 적용하는 정리·보조정리·항등식 → 결론/출력)
+- 각 단계의 provenance 라벨:
+    source-explicit   = 원문이 그 단계를 명시적으로 증명/서술
+    source-implicit   = 원문 맥락에서 직접 따라오나 명시 단계는 아님
+    curator-inferred  = curator가 메운 표준 단계 (tex-writer는 "논문이 증명했다"로 쓰지 않음)
+    unavailable       = 원문에 없고 표준으로도 못 메움 (tex-writer는 증명하지 않고 black-box 인용)
+- 사용하는 비자명 보조 결과의 정확한 진술과 출처 (외부 정리·부등식·항등식을 진술 그대로, 부등식이면 방향·상수까지 + locator)
+- 상수·부등식 방향·수렴 양상이 단계마다 어디서 오는지
+- 강의 표기로의 notation transfer (원문 기호 → 강의 기호 사전)
+```
+
+tex-writer는 이 skeleton의 `source-explicit`/`source-implicit` 단계만 증명 개요로 쓸 수 있고, 부족하면 자의로 메우지 않고 theory-curator에 escalation한다(§5.5). theory-curator는 필요하면 WebSearch/WebFetch로 원문 증명을 더 확인해 supplement에 채운다.
+
 ---
 
 ## 5. 분기 규칙
@@ -215,14 +236,16 @@ tex-writer가 output/typeset_check_NN.md와 round report를 읽고 output/lectur
 
 ### 5.3 mathematician-gate FAIL
 
-`repair_channel` 기준으로 분기한다.
+math gate의 모든 stall은 `repair_channel=tex-writer`다(hook 강제). 따라서 분기는 **항상 tex-writer로** 간다.
 
-| repair_channel | 의미 | 다음 |
-|---|---|---|
-| `tex-writer` | 내부 정의·논리·표현 보강으로 해결 가능 | tex-writer 재집필 |
-| `theory-curator` | theory claim card가 얕거나 notation transfer가 부족 | theory-curator 보강 |
-| `researcher` | 새 source 확인 또는 원문 확인 필요 | researcher 보강 후 theory-curator |
-| `manual_decision` | 강의 범위·증명 생략·정책 판단 | 즉시 BLOCKED |
+```text
+tex-writer가 output/gate_log_NN.jsonl 마지막 FAIL line의 stall을 모두 읽고,
+각 stall을 ① 내부 보강(정의·기호·논리·계산 적법성·표기)으로 직접 해결하거나,
+② theory.md로는 자의적 보충 없이 못 쓰는 경우 §5.5 escalation을 낸다.
+→ lecture.tex 변경 시 typeset-checker부터 재시작.
+```
+
+math gate는 "theory가 부족하다/새 source가 필요하다"를 판정하지 않는다(theory.md를 보지도 못한다). 그 판단은 §5.5에서 tex-writer가 한다.
 
 ### 5.4 literature-gate lecture FAIL
 
@@ -232,6 +255,27 @@ tex-writer가 output/typeset_check_NN.md와 round report를 읽고 output/lectur
 | theory.md가 원문과 불일치 | `theory-curator` 수정 |
 | source 미확인 | `researcher` 보강 |
 | 정책 판단 | `manual_decision`로 중단 |
+
+### 5.5 tex-writer escalation (자료조사 진입점 단일화)
+
+tex-writer는 **자의적으로 증명·내용을 채우지 않는다**. math gate stall(§5.3)이나 자기 집필 중, theory.md의 claim card·proof skeleton만으로는 자의적 보충 없이 본문을 쓸 수 없다고 판단하면, `.tex`를 추측으로 메우지 말고 **구조화된 escalation을 보고**한다(오케스트레이터가 라우팅).
+
+escalation 보고 형식(tex-writer 최종 메시지에 포함):
+
+```text
+ESCALATION:
+- target: theory-curator | researcher
+- claim_id: 관련 claim card (있으면)
+- gap: 무엇이 부족한가 (예: "claim Sx-Cy의 증명 단계 일부가 curator-inferred로만 있어 본문 증명 개요를 자의적 보충 없이 쓸 수 없음")
+- research_question: 조사·보강해야 할 정확한 질문
+- minimum_acceptance: 무엇이 채워지면 tex-writer가 진행 가능한가
+```
+
+오케스트레이터 분기:
+- `target=theory-curator` → theory-curator가 `work/lectureNN_theory_supplement_RR.md` 작성(원문 증명을 §4.2.1 수준으로 상세화) → theory.md 변경 취급 → §6 invalidation(literature dossier 재실행 등) → tex-writer 재집필.
+- `target=researcher` → researcher가 `work/lectureNN_research_supplement_RR.md` 보강 → theory-curator 보강 → 이하 동일.
+
+즉 math gate·literature gate가 무엇을 요구하든, **theory/research 보강이 필요한지의 최종 판단과 요청 작성은 tex-writer가 단일 진입점으로 수행한다**. tex-writer 스스로 증명을 지어내는 것은 금지다.
 
 ---
 
@@ -301,7 +345,7 @@ output/literature_gate_NN.jsonl
 `output/gate_log_NN.jsonl`의 새 줄은 compact JSON 한 줄이어야 한다.
 
 ```json
-{"schema_version":"math-gate-source-fidelity","lecture":"NN","iter":1,"inputs":{"lecture_tex":{"path":"output/lectureNN.tex","sha256":"..."},"theory_md":{"path":"work/lectureNN_theory.md","sha256":"..."},"typeset_report":{"path":"output/typeset_check_NN.md","sha256":"..."}},"verdict":"PASS","stall_count":0,"sections":[{"name":"full-document","status":"PASS","stalls":[]}],"global_checks":{"stage_block":true,"all_objects_attached":true,"compute_decl_complete":true,"analytic_legality":true,"predicate_classified":true,"source_claim_alignment":true},"revision_directives":[],"evidence":{"audited_sections":["full-document"],"checked_claim_ids":[],"note":"..."}}
+{"schema_version":"math-gate-source-fidelity","lecture":"NN","iter":1,"inputs":{"lecture_tex":{"path":"output/lectureNN.tex","sha256":"..."},"theory_md":{"path":"work/lectureNN_theory.md","sha256":"..."},"typeset_report":{"path":"output/typeset_check_NN.md","sha256":"..."}},"verdict":"PASS","stall_count":0,"sections":[{"name":"full-document","status":"PASS","stalls":[]}],"global_checks":{"stage_block":true,"all_objects_attached":true,"compute_decl_complete":true,"analytic_legality":true,"predicate_classified":true,"no_scaffolding_leak":true},"revision_directives":[],"evidence":{"audited_sections":["full-document"],"note":"..."}}
 ```
 
 ### 7.2 literature-gate log schema
@@ -407,6 +451,9 @@ E. final pdftotext gate PASS
 - 관련 문헌 나열과 역사적 맥락은 `research.md`를 근거로 쓸 수 있다.
 - formal claim은 `theory.md`의 `claim_id`를 가져야 한다.
 - load-bearing 외부 claim은 comment-only source tag로 충분하지 않다. 독자에게 보이는 source dependency remark 또는 macro가 필요하다.
+- **독자에게 보이는 부분은 실제 서지 인용이어야 한다** — `\cite{key}`로 참고문헌 항목을 가리켜 `[n]` 번호 + 저자·연도로 렌더한다(사양서 §2.8 author-year 정책). theory dossier의 내부 식별자(`S1-C1` 같은 `source_id-claim_id`)는 **독자에게 노출하지 않는다**. 그 claim_id는 기계 추적용 LaTeX 주석(`% source_claim: S1-C1`)으로만 남긴다. 즉 독자는 `[n]`(저자, 연도)를 보고, 게이트는 주석의 `Sx-Cy`로 추적한다.
+- `S<숫자>-C<숫자>` 같은 내부 claim_id나 사양서 절 표시(§2.6A-5 류)가 독자용 본문·remark 제목에 나타나면 안 된다(누출). typeset-checker가 기계 검출, mathematician-gate가 의미 검출한다.
+- **개념 도입 근거는 빠뜨리지 않되 지어내지 않는다.** 각 핵심 개념·결과는 ① 필연성·동기(직전 한계 → 왜 필요), ② 앞 개념·대안 대비 비교·트레이드오프(기준·측정 양), ③ 유의성(왜 중요한 결과)을 *근거(본문 유도 또는 인용) 있게* 담는다. 체인: researcher 수집 → theory-curator 정착(§5 도입 근거 표) → tex-writer 작성(§6.2, 본문 유도/인용 없는 주장 금지) → mathematician-gate(§6.1a) 무근거 주장 멈춤 + literature-gate 비교·성능·유의성 주장 fidelity 감사. 근거가 없으면 자의로 채우지 말고 tex-writer가 escalation(§5.5).
 
 ---
 

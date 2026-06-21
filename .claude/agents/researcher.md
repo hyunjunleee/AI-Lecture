@@ -49,6 +49,7 @@ work/lectureNN_research.md
 3. 논문·자료마다 `source_id`를 부여한다. 예: `S1`, `S2`, `S3`.
 4. 각 source의 사용 가능성을 분류한다.
 5. theory-curator가 추출해야 할 후보 claim을 요청 목록으로 만든다.
+6. 각 핵심 개념·결과의 **도입 맥락**을 출처와 함께 수집한다(§5의 Context notes): 직전 접근의 한계, 이 개념이 등장한 이유(필연성·동기), 앞 개념·대안 대비 비교·트레이드오프, 왜 중요한 결과인지(유의성). 비교·성능 주장은 1차 출처와 함께, empirical이면 그 라벨을 단다 — theory-curator가 §6.2 도입 근거로 정착시킬 재료다.
 
 ## 5. 산출물: `work/lectureNN_research.md`
 
@@ -92,6 +93,11 @@ work/lectureNN_research.md
 
 tex-writer가 역사적·맥락적 설명에만 사용할 수 있는 내용.
 Formal theorem, guarantee, proof로 사용하려면 theory.md claim card가 필요하다.
+
+각 핵심 개념·결과의 **도입 근거**를 출처와 함께 적는다(필연성·동기 / 앞 개념 대비 비교·트레이드오프 / 유의성). 비교·성능 주장에는 측정 양과 출처, empirical 라벨을 단다.
+
+| 개념/결과 | 필연성·동기 | 비교·트레이드오프 (대상·양) | 유의성 | 출처/라벨 |
+|---|---|---|---|---|
 
 ## 5. Non-use warnings
 

@@ -1,0 +1,30 @@
+# ───────────────────────────────────────────────────────────────
+# Python bytecode cache (hook scripts)
+__pycache__/
+*.pyc
+
+# Ephemeral main-orchestrator-free policy backups
+.main_orchestrator_free_backups/
+
+# ───────────────────────────────────────────────────────────────
+# Generated lecture artifacts (any lecture NN — covers lecture07).
+# The pipeline machinery is tracked; per-lecture outputs are not.
+# Patterns are chosen NOT to match the tracked .gitkeep placeholders.
+
+# researcher / theory-curator outputs
+work/lecture*
+
+# tex-writer / gate / typeset outputs
+output/lecture*
+output/gate_log_*.jsonl
+output/literature_gate_*.jsonl
+output/typeset_check_*.md
+output/final_pdftotext_check_*.md
+
+# xelatex build dirs and pdftoppm previews
+output/build/
+output/preview/
+
+# ───────────────────────────────────────────────────────────────
+# Run/audit logs (agent trace + narrative)
+logs/

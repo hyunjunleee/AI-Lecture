@@ -10,6 +10,18 @@ REPAIR_CHANNELS = {"tex-writer", "researcher", "theory-curator", "literature-gat
 WEB_AGENTS = {"researcher", "theory-curator", "literature-gate"}
 BLOCKED_SHELL_FRAGMENTS = [";", "&&", "||", "|", "`", "$(", ">", "<", "\n", "\r"]
 
+# mathematician-gate is a blank-slate internal-math auditor. It may Read ONLY the
+# lecture .tex (audit target) and its own gate log (append-prefix / prior iters).
+# theory.md, the typeset report, spec/, research.md, the literature gate log,
+# logs/**, .claude/** are all blocked: the auditor must reconstruct meaning purely
+# from the .tex, with no source/theory context to lean on. (It still computes
+# theory.md / typeset_report digests via `sha256sum` for the schema binding — that
+# hashes the files without reading their content.)
+MATH_READ_RE = re.compile(
+    r"^(?:output/lecture\d{2}\.tex"
+    r"|output/gate_log_\d{2}\.jsonl)$"
+)
+
 WRITE_OWNERS: List[Tuple[str, str]] = [
     ("work/lecture[0-9][0-9]_research.md", "researcher"),
     ("work/lecture[0-9][0-9]_research_supplement_[0-9][0-9].md", "researcher"),
@@ -32,7 +44,11 @@ def deny(reason: str) -> None: out("deny", reason)
 
 def norm(p: Any) -> str:
     s = str(p or "").strip().replace("\\", "/")
-    return s[2:] if s.startswith("./") else s
+    if s.startswith("./"):
+        s = s[2:]
+    if len(s) > 1:
+        s = s.rstrip("/")  # tolerate a trailing slash (e.g. "output/") without flagging it unsafe
+    return s
 
 def safe(p: str) -> bool:
     p = norm(p)
@@ -168,6 +184,7 @@ def validate_math(obj: Dict[str, Any], path: str, cwd: str) -> None:
         seen.add(st["stall_id"])
         if st.get("principle") not in {"A", "B", "C"}: deny("math stall principle must be A, B, or C.")
         if not isinstance(st.get("symbol_or_claim"), str) or not st.get("symbol_or_claim"): deny("math stall requires symbol_or_claim.")
+        if st.get("repair_channel") != "tex-writer": deny("math gate stalls must route to tex-writer (repair_channel='tex-writer'); deciding whether further research/theory work is needed is tex-writer's call, not the math gate's.")
     if obj["verdict"] == "PASS" and obj.get("stall_count") != 0: deny("PASS requires stall_count == 0.")
     gc = obj.get("global_checks")
     if not isinstance(gc, dict): deny("global_checks object required.")
@@ -237,7 +254,20 @@ def handle_write(tool: str, ti: Dict[str, Any], agent: str, cwd: str) -> None:
             deny(f"orchestrator path invalid or escapes project root: {raw!r}")
         if m("spec/**", opath) or m("template/**", opath):
             deny(f"{tool} to spec/ or template/ is forbidden: {opath}")
+        if is_gate(opath):
+            deny(f"gate logs are append-only audit artifacts; only the owning gate subagent may write them, not the orchestrator: {opath}")
         allow(f"orchestrator {tool} accepted: {opath}")
+    # Subagent tools pass an absolute file_path; normalize it to a project-relative
+    # path so ownership/safety checks operate uniformly (the orchestrator branch
+    # above already does this for itself). An absolute path outside the project
+    # root is rejected.
+    if raw.startswith("/"):
+        try:
+            rel = Path(raw).resolve().relative_to(Path(cwd).resolve())
+            if not rel.parts: deny(f"{tool} path resolves to project root: {raw!r}")
+            raw = "/".join(rel.parts)
+        except Exception:
+            deny(f"{tool} path is absolute and escapes project root: {raw!r}")
     path = norm(raw)
     if not safe(path): deny(f"unsafe or missing file_path: {path!r}")
     if m("spec/**", path) or m("template/**", path): deny(f"{tool} to spec/ or template/ is forbidden: {path}")
@@ -347,6 +377,25 @@ def check_typeset(argv: List[str]) -> None:
         return
     deny(f"Bash command not allowed for typeset-checker: {cmd}")
 
+def handle_read(ti: Dict[str, Any], agent: str, cwd: str) -> None:
+    # Only mathematician-gate is restricted; every other agent's Read falls through.
+    if agent != "mathematician-gate":
+        return
+    raw = str(ti.get("file_path", "") or "").strip().replace("\\", "/")
+    if raw.startswith("/"):
+        try:
+            rel = Path(raw).resolve().relative_to(Path(cwd).resolve())
+            raw = "/".join(rel.parts)
+        except Exception:
+            deny(f"mathematician-gate Read path is absolute and escapes project root: {raw!r}")
+    path = norm(raw)
+    if not safe(path):
+        deny(f"mathematician-gate unsafe Read path: {path!r}")
+    if MATH_READ_RE.match(path):
+        allow(f"mathematician-gate Read whitelisted: {path}")
+    deny(f"mathematician-gate may not Read {path}. Allowed only: output/lecture<NN>.tex and its own output/gate_log_<NN>.jsonl. (theory.md, typeset report, spec/, research.md, other logs, .claude/ are all blocked — blank-slate auditor. Use sha256sum, not Read, for theory/typeset digests.)")
+
+
 def handle_bash(ti: Dict[str, Any], agent: str) -> None:
     if not agent or agent == "unknown":
         argv = parse(ti.get("command", ""))
@@ -375,6 +424,7 @@ def main() -> None:
     agent = data.get("agent_type") or data.get("agent_name") or data.get("subagent_type") or "unknown"
     cwd = data.get("cwd") or os.getcwd()
     if tool in {"Write", "Edit"}: handle_write(tool, ti, str(agent), cwd)
+    if tool == "Read": handle_read(ti, str(agent), cwd)
     if tool == "Bash": handle_bash(ti, str(agent))
     if tool in {"WebSearch", "WebFetch"}:
         if agent in WEB_AGENTS: allow(f"{tool} accepted for {agent}")

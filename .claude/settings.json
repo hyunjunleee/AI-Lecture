@@ -2,14 +2,10 @@
   "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "model": "claude-sonnet-4-6",
   "permissions": {
-    "defaultMode": "default",
+    "defaultMode": "acceptEdits",
     "disableBypassPermissionsMode": "disable",
     "disableAutoMode": "disable",
     "deny": [
-      "Write(spec/**)",
-      "Edit(spec/**)",
-      "Write(template/**)",
-      "Edit(template/**)",
       "Read(.env)",
       "Read(**/.env)",
       "Read(**/.env.*)",
@@ -21,7 +17,6 @@
       "mcp__*",
       "Bash(rm *)",
       "Bash(rmdir *)",
-      "Bash(mv *)",
       "Bash(chmod *)",
       "Bash(chown *)",
       "Bash(sudo *)",
@@ -81,7 +76,13 @@
       "Write(.claude/**)",
       "Edit(.claude/**)",
       "Write(**)",
-      "Edit(**)"
+      "Edit(**)",
+      "Read(**)",
+      "MultiEdit(**)",
+      "NotebookEdit(**)",
+      "Bash(touch *)",
+      "Bash(cp *)",
+      "Bash(mv *)"
     ]
   },
   "hooks": {
@@ -91,7 +92,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 .claude/hooks/pipeline_policy.py"
+            "command": "python3 .claude/hooks/pipeline_policy_main_free.py"
           }
         ]
       }

@@ -55,6 +55,36 @@ grep -nF "\\label{" output/lectureNN.tex
 
 label 중복은 `grep -nF "\\label{"` 출력 목록을 읽고 수동으로 같은 label이 2회 이상 있는지 판단한다. `sort | uniq` pipe를 쓰지 않는다.
 
+### 4.1b 제작 사양서 절 표시 누출 점검
+
+제작 사양서·커리큘럼의 **내부 절 표시**가 독자용 본문에 새어 들어갔는지 점검한다. 이런 표시는 학생용 PDF에 의미 없는 제작 스캐폴딩이며 강의 자체에 존재하지 않는 위치를 가리킨다(예: 독자용 문장 끝의 `(§2.6A-5)` — 제작 사양서의 절 번호이지 이 강의의 절이 아니다).
+
+**중요 인코딩 주의**: `.tex` 소스에서 절 기호는 literal `§`가 아니라 LaTeX 매크로 `\S`로 쓰일 수 있다(예: `\S2.6A-5`). 따라서 `.tex`에는 literal `§`와 `\S` 매크로 **둘 다** 검사한다. pdftotext 산출 `.txt`에서는 literal `§`로 렌더된다.
+
+`.tex` 검사(6종, 각각 독립 실행):
+
+```bash
+grep -nE "§[0-9]+\.[0-9]+[A-Za-z]" output/lectureNN.tex
+grep -nE "§[0-9]+\.[0-9]+-[0-9A-Za-z]" output/lectureNN.tex
+grep -nE "§0\.0" output/lectureNN.tex
+grep -nE "\\\\S[0-9]+\.[0-9]+[A-Za-z]" output/lectureNN.tex
+grep -nE "\\\\S[0-9]+\.[0-9]+-[0-9A-Za-z]" output/lectureNN.tex
+grep -nE "\\\\S0\.0" output/lectureNN.tex
+```
+
+(`.txt` 검사는 §4.4에서 literal `§` 3종을 실행한다.)
+
+판정 규칙:
+- 위 패턴 중 하나라도 **1건 이상 매치되면 FAIL**. 매치된 줄 번호와 표시 문자열을 보고하고, `tex-writer`가 해당 절 표시를 제거하거나 강의 자체 절 참조(`\S1`, `\S5` 등)·실제 인용으로 대체하도록 지시한다(repair_channel=tex-writer).
+- 대상은 **사양서 절 표시의 모호하지 않은 형태**뿐: `§/\S` + `숫자.숫자` 뒤에 ① 영문자(`§2.6A`, `§2.8b`), ② `-접미사`(`§2.11-9`, `§2.15-5`, `§2.6A-5`), 또는 ③ `§0.0` 류.
+- **오탐 회피(매치되지 않음, 정상)**:
+  - 외부 논문 인용의 plain `§숫자.숫자`(`§2.10`, `§2.8` — Cover&Thomas 등): 뒤에 영문자/하이픈접미사가 없으므로 패턴 1·2에 안 잡힌다.
+  - 인용 범위 `§2.1--§2.4`(en-dash `--`): 패턴 2는 `-` 뒤에 영숫자를 요구하므로 `--`(하이픈+하이픈)는 안 잡힌다.
+  - 강의 자체 절 `§1`…`§8` / `\S1`…`\S8` / `\S\ref{...}`: 소수점이 없어 안 잡힌다.
+  - 다른 강 참조("8강", "제0강", "12강"): `강`은 `§`가 아니므로 무관.
+- **알려진 한계(보고서에 명시)**: plain `§숫자.숫자` 형태의 *사양서* 참조(예: 본문에 "사양서 §2.10")는 동일 형태의 논문 인용과 구별 불가하여 자동 매치하지 않는다. 이 모호 사례는 mathematician-gate §6.5(의미 판단)가 보조로 잡는다.
+- 수학 내용 판단은 하지 않는다 — 순수 패턴 매치다(§1 계약 유지).
+
 ### 4.2 round-specific build directory
 
 ```bash
@@ -92,7 +122,13 @@ cp output/build/lectureNN_roundRR/lectureNN.log output/lectureNN.log
 pdftotext -layout output/lectureNN.pdf output/lectureNN.txt
 grep -n "??" output/lectureNN.txt
 grep -n "Undefined" output/lectureNN.txt
+grep -nE "§[0-9]+\.[0-9]+[A-Za-z]" output/lectureNN.txt
+grep -nE "§[0-9]+\.[0-9]+-[0-9A-Za-z]" output/lectureNN.txt
+grep -nE "§0\.0" output/lectureNN.txt
+grep -nE "S[0-9]+-C[0-9]+" output/lectureNN.txt
 ```
+
+마지막 `S[0-9]+-C[0-9]+` grep은 theory dossier 내부 식별자(claim_id, 예 `S1-C1`)가 독자용 텍스트에 새어들었는지 본다. 렌더된 `.txt`에는 LaTeX 주석(`% source_claim: ...`)이 들어가지 않으므로, `.txt`에서 `S<숫자>-C<숫자>`가 매치되면 그것은 **독자에게 보이는 누출**이다(remark에 `[n]` 인용 대신 raw claim_id를 쓴 경우) → **FAIL**, repair_channel=tex-writer. 정상적으로는 독자는 `[2]` 같은 인용번호만 보고 claim_id는 주석에만 있어야 한다.
 
 ### 4.5 preview 생성
 
@@ -129,6 +165,8 @@ sha256sum output/lectureNN.txt
 - inputminted/input:
 - label 목록:
 - label 중복:
+- 사양서 절 표시 누출(§2.6A-5 류): (매치 줄·표시 또는 "없음")
+- 내부 claim_id 누출(S1-C1 류, .txt 기준): (매치 줄·표시 또는 "없음")
 
 ## 2. 컴파일
 - build dir: output/build/lectureNN_roundRR
@@ -168,6 +206,10 @@ pdftotext -layout output/lectureNN.pdf output/lectureNN_final.txt
 grep -n "??" output/lectureNN_final.txt
 grep -n "Undefined" output/lectureNN_final.txt
 grep -n "�" output/lectureNN_final.txt
+grep -nE "§[0-9]+\.[0-9]+[A-Za-z]" output/lectureNN_final.txt
+grep -nE "§[0-9]+\.[0-9]+-[0-9A-Za-z]" output/lectureNN_final.txt
+grep -nE "§0\.0" output/lectureNN_final.txt
+grep -nE "S[0-9]+-C[0-9]+" output/lectureNN_final.txt
 sha256sum output/lectureNN.pdf
 sha256sum output/lectureNN_final.txt
 sha256sum output/lectureNN.tex
@@ -177,6 +219,8 @@ sha256sum output/literature_gate_NN.jsonl
 ```
 
 주요 절 제목, theorem/definition/stage/computebox 제목, source dependency remark가 추출되는지 `output/lectureNN_final.txt`를 읽고 확인한다.
+
+위 사양서 절 표시 누출 grep 3종 또는 내부 claim_id 누출 grep(`S[0-9]+-C[0-9]+`) 중 하나라도 매치되면 final 판정도 **FAIL**(매치 줄·표시 보고, `tex-writer` 수정 필요).
 
 ## 7. Final mode 산출물
 
@@ -201,6 +245,8 @@ sha256sum output/literature_gate_NN.jsonl
 - ?? 없음:
 - Undefined 없음:
 - replacement character 없음:
+- 사양서 절 표시 누출 없음(§2.6A-5 류):
+- 내부 claim_id 누출 없음(S1-C1 류):
 
 ## 3. 구조 추출
 - 주요 절 제목:
