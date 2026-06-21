@@ -130,10 +130,11 @@ grep -nF "문헌 의존성" output/lectureNN.txt
 grep -nF "강의를 읽는 법" output/lectureNN.txt
 grep -nF "강의 내부" output/lectureNN.txt
 grep -nF "black-box" output/lectureNN.txt
-grep -nF "epistemic" output/lectureNN.txt
 ```
 
-`문헌 의존성`·`강의를 읽는 법`·`강의 내부`·`black-box`·`epistemic` grep은 **메타-서술 잔류**를 본다 — 독자 몰입을 깨는 저자 작업노트·커리큘럼 라벨은 본문에서 100% 제거되어야 한다(tex-writer §5A-8). 렌더 `.txt`에 하나라도 매치되면 **FAIL**, repair_channel=tex-writer(해당 라벨·박스를 제거하고 그 내용은 인라인 산문으로 흡수). 출처 귀속은 본문 산문 속 `[n]` 인라인 인용으로 살아 있어야 정상이다.
+`문헌 의존성`·`강의를 읽는 법`·`강의 내부`·`black-box` grep은 **메타-서술 잔류**를 본다 — 독자 몰입을 깨는 저자 작업노트·파이프라인 라벨은 본문에서 100% 제거되어야 한다(tex-writer §5A-8). 렌더 `.txt`에 하나라도 매치되면 **FAIL**, repair_channel=tex-writer(해당 라벨·박스를 제거하고 그 내용은 인라인 산문으로 흡수). 출처 귀속은 본문 산문 속 `[n]` 인라인 인용으로 살아 있어야 정상이다.
+
+**예외 — `[epistemic: …]`는 grep 대상이 아니다.** 사양서 §2.13·§2.8이 의무화한 표준 불확실성 라벨(`[epistemic: 검색 미수행]` 등)은 독자에게 보이는 *content honesty 라벨*이며 제거 대상이 아니다(§2.13은 오히려 접두어 없는 "확인 필요/미정/TODO"를 QA 실패로 본다). `epistemic`을 메타 grep에서 제외한다.
 
 마지막 `S[0-9]+-C[0-9]+` grep은 theory dossier 내부 식별자(claim_id, 예 `S1-C1`)가 독자용 텍스트에 새어들었는지 본다. 렌더된 `.txt`에는 LaTeX 주석(`% source_claim: ...`)이 들어가지 않으므로, `.txt`에서 `S<숫자>-C<숫자>`가 매치되면 그것은 **독자에게 보이는 누출**이다(remark에 `[n]` 인용 대신 raw claim_id를 쓴 경우) → **FAIL**, repair_channel=tex-writer. 정상적으로는 독자는 `[2]` 같은 인용번호만 보고 claim_id는 주석에만 있어야 한다.
 

@@ -31,6 +31,7 @@ work/lectureNN_research.md
 work/lectureNN_research_supplement_RR.md, 있으면
 spec/AI28_강의제작_사양서_v13-2.md
 spec/AI_curriculum_28강.md
+spec/curriculum_decisions_log.md
 ```
 
 보강 모드에서는 literature/math gate의 해당 stall도 읽는다.

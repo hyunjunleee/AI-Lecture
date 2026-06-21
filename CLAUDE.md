@@ -447,6 +447,7 @@ E. final pdftotext gate PASS
 ## 11. 기본값
 
 - 강의 콘텐츠 기본값: 이론 전용. 코드 실습 제외.
+- **사양서의 코드·실습·재현성 조항은 이 이론 전용 파이프라인에서 비적용**: §0(minted·`-shell-escape`)·§1(PDF/py/png 3파일)·§2.5·§2.12·§3(minted 툴체인)·§4·§5·§6·D2. 산출물은 PDF 하나, xelatex는 `-shell-escape` 없이 돌리고 minted를 쓰지 않는다(tex-writer §7.4). 사양서의 이론 관련 조항(§0.0·§0.2·§0.4·§2.6~2.16·§8 무정지 게이트)만 적용된다.
 - 논문 장문 직접 인용 금지. 짧은 식별용 anchor만 허용.
 - 관련 문헌 나열과 역사적 맥락은 `research.md`를 근거로 쓸 수 있다.
 - formal claim은 `theory.md`의 `claim_id`를 가져야 한다.
