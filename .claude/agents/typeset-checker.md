@@ -48,6 +48,8 @@ grep -cF "\\begin{" output/lectureNN.tex
 grep -cF "\\end{" output/lectureNN.tex
 grep -nF "\\inputminted{" output/lectureNN.tex
 grep -nF "\\input{" output/lectureNN.tex
+grep -nF "\\usepackage{minted}" output/lectureNN.tex
+grep -nE "\\usepackage\\[[^]]*\\]\\{minted\\}" output/lectureNN.tex
 grep -nF "\\label{" output/lectureNN.tex
 ```
 

@@ -154,6 +154,21 @@ comment-only source tag는 machine trace로만 사용한다. 독자에게 보이
 - `repair_channel == tex-writer`이면 overclaim을 줄이고 theory.md 경계에 맞춘다.
 - 다른 repair_channel이면 `.tex`를 덮어쓰지 않고 BLOCKER를 보고한다.
 
+## 7.4 minted 금지
+
+`template/lecture_template.tex`에 `\\usepackage[outputdir=.]{minted}`가 포함되어 있어도 `output/lectureNN.tex`에는 넣지 않는다. hook이 `-shell-escape` 없이 xelatex를 실행하므로 minted 패키지가 있으면 첫 컴파일에서 즉시 halt된다.
+
+금지 항목:
+
+```text
+\usepackage{minted}
+\usepackage[...]{minted}
+\begin{minted}...\end{minted}
+\inputminted{...}{...}
+```
+
+코드 실습은 이론 전용 강의에 포함하지 않는다 (CLAUDE.md §11).
+
 ## 8. 산출물
 
 `output/lectureNN.tex`만 저장한다. 전체 LaTeX 파일이어야 한다.

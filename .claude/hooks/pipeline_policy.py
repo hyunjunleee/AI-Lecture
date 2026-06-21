@@ -214,7 +214,7 @@ def validate_lit(obj: Dict[str, Any], path: str, cwd: str) -> None:
         seen.add(st["stall_id"])
         if not isinstance(st.get("fidelity_axis"), str) or not st.get("fidelity_axis"):
             deny("literature stall requires fidelity_axis.")
-        if mode == "lecture" and not st.get("claim_id"): deny("lecture-mode stall requires claim_id or document-level marker.")
+        if mode == "lecture" and not st.get("claim_id") and not st.get("document_level"): deny("lecture-mode stall requires claim_id or document_level:true.")
     if obj["verdict"] == "PASS" and obj.get("stall_count") != 0: deny("PASS requires stall_count == 0.")
     gc = obj.get("global_checks")
     if not isinstance(gc, dict): deny("global_checks object required.")
@@ -226,7 +226,19 @@ def validate_lit(obj: Dict[str, Any], path: str, cwd: str) -> None:
         deny("PASS requires evidence.checked_claim_ids list.")
 
 def handle_write(tool: str, ti: Dict[str, Any], agent: str, cwd: str) -> None:
-    path = norm(ti.get("file_path", ""))
+    raw = str(ti.get("file_path", "") or "").strip().replace("\\", "/")
+    if not agent or agent == "unknown":
+        try:
+            abs_root = Path(cwd).resolve()
+            rel = Path(raw).resolve().relative_to(abs_root)
+            if not rel.parts: deny(f"orchestrator {tool} path resolves to project root: {raw!r}")
+            opath = "/".join(rel.parts)
+        except Exception:
+            deny(f"orchestrator path invalid or escapes project root: {raw!r}")
+        if m("spec/**", opath) or m("template/**", opath):
+            deny(f"{tool} to spec/ or template/ is forbidden: {opath}")
+        allow(f"orchestrator {tool} accepted: {opath}")
+    path = norm(raw)
     if not safe(path): deny(f"unsafe or missing file_path: {path!r}")
     if m("spec/**", path) or m("template/**", path): deny(f"{tool} to spec/ or template/ is forbidden: {path}")
     owner = None
@@ -276,7 +288,7 @@ def check_sha(argv: List[str]) -> None:
     if argv[0] != "sha256sum" or len(argv) < 2: deny("sha256sum requires paths.")
     paths = [norm(x) for x in argv[1:]]; req_paths(paths)
     for p in paths:
-        if not (is_research(p) or is_theory(p) or is_tex(p) or is_pdf(p) or is_txt(p) or is_report(p) or is_gate(p)):
+        if not (is_research(p) or is_theory(p) or is_tex(p) or is_pdf(p) or is_txt(p) or is_log(p) or is_report(p) or is_gate(p)):
             deny(f"sha256sum path not allowed: {p}")
 
 def check_typeset(argv: List[str]) -> None:
@@ -336,7 +348,18 @@ def check_typeset(argv: List[str]) -> None:
     deny(f"Bash command not allowed for typeset-checker: {cmd}")
 
 def handle_bash(ti: Dict[str, Any], agent: str) -> None:
-    if not agent or agent == "unknown": deny("Bash denied: agent_type missing. Fail-closed.")
+    if not agent or agent == "unknown":
+        argv = parse(ti.get("command", ""))
+        cmd = argv[0] if argv else ""
+        if cmd == "sha256sum":
+            req_paths([norm(x) for x in argv[1:]]); allow("orchestrator sha256sum accepted")
+        if cmd == "mkdir" and len(argv) >= 2 and argv[1] == "-p":
+            req_paths([norm(x) for x in argv[2:]]); allow("orchestrator mkdir accepted")
+        if cmd == "ls":
+            req_paths([norm(x) for x in argv[1:]]); allow("orchestrator ls accepted")
+        if cmd in {"python3", "python"} and len(argv) >= 3 and argv[1] == "-m" and argv[2] == "py_compile":
+            allow("orchestrator py_compile accepted")
+        deny(f"orchestrator Bash restricted to sha256sum/mkdir/ls/py_compile; got {cmd!r}.")
     argv = parse(ti.get("command", ""))
     if agent == "typeset-checker": check_typeset(argv); allow("typeset-checker Bash command accepted")
     if agent in {"mathematician-gate", "literature-gate"}:

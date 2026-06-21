@@ -118,6 +118,9 @@ JSON의 `inputs`에 path와 sha256을 기록한다. hook이 현재 digest와 일
 
 ## 9. 제약
 
+- 모든 math stall에는 `principle` 필드가 필수다 (`"A"`, `"B"`, `"C"` 중 하나; 없으면 hook deny).
+- `stall_count`는 모든 `sections[].stalls[]` 원소의 총합과 정확히 같아야 한다.
+- `FAIL` verdict이면 `revision_directives`가 비어있으면 안 된다.
 - 대표 사례만 보고 PASS 금지. 전수 감사 근거가 있어야 한다.
 - `.tex`를 수정하지 않는다.
 - 웹 검색하지 않는다.
