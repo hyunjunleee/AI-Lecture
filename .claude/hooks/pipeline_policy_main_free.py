@@ -58,7 +58,7 @@ SHELL_METACHARS = ("|", ";", "&&", "||", "`", "$(", ">", "<", "\n")
 # orchestrator writes (and, for gate logs, schema/digest-validates subagent
 # writes). Everything else stays freely mutable so the pipeline can be iterated
 # on conversationally.
-GATE_LOG_RE = re.compile(r"(?:^|/)(?:gate_log|literature_gate)_\d{2}\.jsonl$")
+GATE_LOG_RE = re.compile(r"(?:^|/)(?:gate_log|literature_gate|read_gate|claim_gate|model_gate)_\d{2}(?:_r\d+)?\.jsonl$")
 PROTECTED_PREFIXES = ("spec/", "template/")
 
 
@@ -158,6 +158,29 @@ def is_protected_mutation(event: Dict[str, Any]) -> bool:
     return rel.startswith(PROTECTED_PREFIXES)
 
 
+# The orchestrator tunes the PIPELINE (its own machinery) but must NOT author or alter
+# ARTIFACTS: every work/** and output/** file is produced solely by its owning subagent
+# (researcher / theory-curator / tex-writer / typeset-checker / gates). The orchestrator's
+# directly-writable domain is therefore limited to .claude/** (agents, settings, hooks,
+# policy), logs/** (its own run narrative), and top-level repo meta (CLAUDE.md, .gitignore,
+# README, ...). Anything else falls through to the original policy, which denies orchestrator
+# artifact writes and validates subagent writes by ownership.
+def is_orchestrator_writable(event: Dict[str, Any]) -> bool:
+    cwd = event.get("cwd") or os.getcwd()
+    rel = project_relative(mutation_target(event), cwd if isinstance(cwd, str) else os.getcwd())
+    if not rel:
+        return False
+    if rel.startswith(("spec/", "template/", "work/", "output/")):
+        return False
+    if GATE_LOG_RE.search(rel):
+        return False
+    if rel.startswith((".claude/", "logs/")):
+        return True
+    if "/" not in rel:  # top-level repo-meta file
+        return True
+    return False
+
+
 def is_simple_main_fs_bash(command: str) -> bool:
     if not command.strip():
         return False
@@ -223,12 +246,14 @@ def main() -> int:
     }
 
     if is_main_orchestrator:
-        if name in FILE_MUTATION_TOOLS and not is_protected_mutation(event):
-            audit(record, "allow", "main orchestrator file mutation allowed (non-protected)", "wrapper")
-            allow("main orchestrator file mutation allowed (non-protected)")
-        if name == "Bash" and is_simple_main_fs_bash(bash_command(event)):
-            audit(record, "allow", "main orchestrator simple filesystem Bash command allowed", "wrapper")
-            allow("main orchestrator simple filesystem Bash command allowed")
+        # Free mutation only within the orchestrator's own domain (.claude/, logs/, repo
+        # meta). Artifact writes (work/**, output/**), spec/template, and gate logs fall
+        # through to the original policy. Bash also falls through to the original policy
+        # (sha256sum/mkdir/ls/py_compile only) — cp/mv/touch into work/** or output/**
+        # would forge artifacts, so the wrapper no longer grants simple-FS Bash here.
+        if name in FILE_MUTATION_TOOLS and is_orchestrator_writable(event):
+            audit(record, "allow", "main orchestrator domain mutation (.claude/, logs/, repo meta)", "wrapper")
+            allow("main orchestrator may mutate only its own domain (.claude/, logs/, top-level repo meta); work/** and output/** artifacts are authored by subagents")
 
     # Protected mutations (gate logs, spec/, template/) by the orchestrator — and
     # everything else — fall through to the original policy for validation /

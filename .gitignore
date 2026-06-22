@@ -12,14 +12,16 @@ __pycache__/
 # Patterns are chosen NOT to match the tracked .gitkeep placeholders.
 
 # researcher / theory-curator outputs
-work/lecture*
+# work/lecture*
+work/*
 
 # tex-writer / gate / typeset outputs
-output/lecture*
-output/gate_log_*.jsonl
-output/literature_gate_*.jsonl
-output/typeset_check_*.md
-output/final_pdftotext_check_*.md
+output/*
+# output/lecture*
+# output/gate_log_*.jsonl
+# output/literature_gate_*.jsonl
+# output/typeset_check_*.md
+# output/final_pdftotext_check_*.md
 
 # xelatex build dirs and pdftoppm previews
 output/build/

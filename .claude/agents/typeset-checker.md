@@ -223,18 +223,20 @@ grep -nF "문헌 의존성" output/lectureNN_final.txt
 grep -nF "강의를 읽는 법" output/lectureNN_final.txt
 grep -nF "강의 내부" output/lectureNN_final.txt
 grep -nF "black-box" output/lectureNN_final.txt
-grep -nF "epistemic" output/lectureNN_final.txt
 sha256sum output/lectureNN.pdf
 sha256sum output/lectureNN_final.txt
 sha256sum output/lectureNN.tex
 sha256sum work/lectureNN_theory.md
-sha256sum output/gate_log_NN.jsonl
-sha256sum output/literature_gate_NN.jsonl
+# 각 게이트의 *최신 verdict 파일* digest — 오케스트레이터가 final 지시에 명시한 경로를 그대로 sha256sum
+# (베이스 output/{gate}_gate_NN.jsonl 또는, 라운드 파일을 썼다면 최신 output/{gate}_gate_NN_rRR.jsonl)
+sha256sum <오케스트레이터가 지정한 read/claim/model/literature 최신 verdict 파일들>
 ```
+
+(`[epistemic: …]`는 grep 대상이 아니다 — 사양서 §2.13 의무 라벨, §4.4 참조.)
 
 주요 절 제목, 정의/정리/명제 제목, source dependency remark가 추출되는지 `output/lectureNN_final.txt`를 읽고 확인한다.
 
-위 사양서 절 표시 누출 grep 3종, 내부 claim_id 누출 grep(`S[0-9]+-C[0-9]+`), 또는 메타-서술 잔류 grep(`문헌 의존성`·`강의를 읽는 법`·`강의 내부`·`black-box`·`epistemic`) 중 하나라도 매치되면 final 판정도 **FAIL**(매치 줄·표시 보고, `tex-writer` 수정 필요).
+위 사양서 절 표시 누출 grep 3종, 내부 claim_id 누출 grep(`S[0-9]+-C[0-9]+`), 또는 메타-서술 잔류 grep(`문헌 의존성`·`강의를 읽는 법`·`강의 내부`·`black-box`) 중 하나라도 매치되면 final 판정도 **FAIL**(매치 줄·표시 보고, `tex-writer` 수정 필요). `[epistemic:]`는 제외.
 
 ## 7. Final mode 산출물
 
@@ -248,8 +250,10 @@ sha256sum output/literature_gate_NN.jsonl
 - final_txt: output/lectureNN_final.txt / sha256: ...
 - lecture_tex: output/lectureNN.tex / sha256: ...
 - theory_md: work/lectureNN_theory.md / sha256: ...
-- math_gate_log: output/gate_log_NN.jsonl / sha256: ...
-- literature_gate_log: output/literature_gate_NN.jsonl / sha256: ...
+- read_gate_log: <최신 read verdict 파일(베이스 또는 _rRR)> / sha256: ...
+- claim_gate_log: <최신 claim verdict 파일> / sha256: ...
+- model_gate_log: <최신 model verdict 파일> / sha256: ...
+- literature_gate_log: <최신 literature verdict 파일> / sha256: ...
 
 ## 1. 텍스트 추출
 - final txt 존재:
@@ -261,7 +265,7 @@ sha256sum output/literature_gate_NN.jsonl
 - replacement character 없음:
 - 사양서 절 표시 누출 없음(§2.6A-5 류):
 - 내부 claim_id 누출 없음(S1-C1 류):
-- 메타-서술 잔류 없음(문헌 의존성/black-box/epistemic 등):
+- 메타-서술 잔류 없음(문헌 의존성/강의 내부/black-box 등; [epistemic:]은 제외):
 
 ## 3. 구조 추출
 - 주요 절 제목:

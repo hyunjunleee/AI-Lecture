@@ -10,17 +10,16 @@ REPAIR_CHANNELS = {"tex-writer", "researcher", "theory-curator", "literature-gat
 WEB_AGENTS = {"researcher", "theory-curator", "literature-gate"}
 BLOCKED_SHELL_FRAGMENTS = [";", "&&", "||", "|", "`", "$(", ">", "<", "\n", "\r"]
 
-# mathematician-gate is a blank-slate internal-math auditor. It may Read ONLY the
-# lecture .tex (audit target) and its own gate log (append-prefix / prior iters).
-# theory.md, the typeset report, spec/, research.md, the literature gate log,
-# logs/**, .claude/** are all blocked: the auditor must reconstruct meaning purely
-# from the .tex, with no source/theory context to lean on. (It still computes
-# theory.md / typeset_report digests via `sha256sum` for the schema binding — that
-# hashes the files without reading their content.)
-MATH_READ_RE = re.compile(
-    r"^(?:output/lecture\d{2}\.tex"
-    r"|output/gate_log_\d{2}\.jsonl)$"
-)
+# The three blank-slate gates (read/claim/model) each may Read ONLY the lecture .tex
+# (audit target) and their OWN gate log. theory.md, typeset report, spec/, research.md,
+# OTHER gates' logs, logs/**, .claude/** are all blocked: each auditor reconstructs
+# meaning purely from the .tex with no source/theory/peer context. (Digests of
+# lecture_tex / typeset_report are computed via `sha256sum`, which hashes without reading.)
+GATE_LOGS = {
+    "read-gate": "read_gate",
+    "claim-gate": "claim_gate",
+    "model-gate": "model_gate",
+}
 
 WRITE_OWNERS: List[Tuple[str, str]] = [
     ("work/lecture[0-9][0-9]_research.md", "researcher"),
@@ -31,8 +30,10 @@ WRITE_OWNERS: List[Tuple[str, str]] = [
     ("output/typeset_check_[0-9][0-9]_round[0-9][0-9].md", "typeset-checker"),
     ("output/typeset_check_[0-9][0-9].md", "typeset-checker"),
     ("output/final_pdftotext_check_[0-9][0-9].md", "typeset-checker"),
-    ("output/gate_log_[0-9][0-9].jsonl", "mathematician-gate"),
-    ("output/literature_gate_[0-9][0-9].jsonl", "literature-gate"),
+    ("output/read_gate_[0-9][0-9]*.jsonl", "read-gate"),
+    ("output/claim_gate_[0-9][0-9]*.jsonl", "claim-gate"),
+    ("output/model_gate_[0-9][0-9]*.jsonl", "model-gate"),
+    ("output/literature_gate_[0-9][0-9]*.jsonl", "literature-gate"),
 ]
 
 def out(decision: str, reason: str) -> None:
@@ -162,29 +163,32 @@ def math_stalls(obj: Dict[str, Any]) -> List[Dict[str, Any]]:
             out.append(st)
     return out
 
-def validate_math(obj: Dict[str, Any], path: str, cwd: str) -> None:
-    if obj.get("schema_version") != "math-gate-source-fidelity": deny("math gate JSON requires schema_version == 'math-gate-source-fidelity'.")
-    mm = re.match(r"^output/gate_log_(\d{2})\.jsonl$", norm(path))
-    if not mm: deny("math gate log path must be output/gate_log_NN.jsonl")
-    nn = mm.group(1)
-    if obj.get("lecture") != nn: deny(f"math gate lecture must be {nn}")
+def validate_gate(obj: Dict[str, Any], path: str, cwd: str) -> None:
+    mm = re.match(r"^output/(read_gate|claim_gate|model_gate)_(\d{2})(?:_r\d+)?\.jsonl$", norm(path))
+    if not mm: deny("gate log path must be output/{read_gate|claim_gate|model_gate}_NN(.jsonl or _rRR.jsonl)")
+    prefix, nn = mm.group(1), mm.group(2)
+    expected_schema = {"read_gate": "read-gate-v1", "claim_gate": "claim-gate-v1", "model_gate": "model-gate-v1"}[prefix]
+    if obj.get("schema_version") != expected_schema: deny(f"{prefix} log requires schema_version == '{expected_schema}'.")
+    if obj.get("lecture") != nn: deny(f"gate log lecture must be {nn}")
     if not isinstance(obj.get("iter"), int) or obj.get("iter") < 1: deny("iter must be a positive integer.")
     check_inputs(obj, {
         "lecture_tex": f"output/lecture{nn}.tex",
-        "theory_md": f"work/lecture{nn}_theory.md",
         "typeset_report": f"output/typeset_check_{nn}.md",
     }, cwd)
-    if obj.get("verdict") not in VERDICTS: deny("math verdict must be PASS or FAIL.")
+    if obj.get("verdict") not in VERDICTS: deny("verdict must be PASS or FAIL.")
     stalls = math_stalls(obj)
-    if obj.get("stall_count") != len(stalls): deny("math stall_count does not match actual stalls.")
+    if obj.get("stall_count") != len(stalls): deny("stall_count does not match actual stalls.")
     seen=set()
     for st in stalls:
         check_stall(st)
         if st["stall_id"] in seen: deny(f"duplicate stall_id: {st['stall_id']}")
         seen.add(st["stall_id"])
-        if st.get("principle") not in {"A", "B", "C"}: deny("math stall principle must be A, B, or C.")
-        if not isinstance(st.get("symbol_or_claim"), str) or not st.get("symbol_or_claim"): deny("math stall requires symbol_or_claim.")
-        if st.get("repair_channel") != "tex-writer": deny("math gate stalls must route to tex-writer (repair_channel='tex-writer'); deciding whether further research/theory work is needed is tex-writer's call, not the math gate's.")
+        if st.get("repair_channel") != "tex-writer": deny("gate stalls must route to tex-writer (repair_channel='tex-writer'); deciding whether further research/theory work is needed is tex-writer's call, not the gate's.")
+        if prefix in ("read_gate", "model_gate") and st.get("principle") not in {"A", "B", "C"}: deny(f"{prefix} stall principle must be A, B, or C.")
+        if prefix == "model_gate" and (not isinstance(st.get("object_or_block"), str) or not st.get("object_or_block")): deny("model gate stall requires object_or_block.")
+        if prefix == "claim_gate":
+            for fld in ("claim_text", "trigger_type", "failed_test"):
+                if not isinstance(st.get(fld), str) or not st.get(fld): deny(f"claim gate stall requires {fld}.")
     if obj["verdict"] == "PASS" and obj.get("stall_count") != 0: deny("PASS requires stall_count == 0.")
     gc = obj.get("global_checks")
     if not isinstance(gc, dict): deny("global_checks object required.")
@@ -192,8 +196,9 @@ def validate_math(obj: Dict[str, Any], path: str, cwd: str) -> None:
     check_dirs(obj, {st["stall_id"] for st in stalls})
     ev=obj.get("evidence")
     if not isinstance(ev, dict): deny("evidence object required.")
-    if obj["verdict"] == "PASS" and (not isinstance(ev.get("audited_sections"), list) or not ev.get("audited_sections")):
-        deny("PASS requires evidence.audited_sections non-empty.")
+    if obj["verdict"] == "PASS":
+        key = "audited_claims" if prefix == "claim_gate" else "audited_sections"
+        if not isinstance(ev.get(key), list) or not ev.get(key): deny(f"PASS requires evidence.{key} non-empty.")
 
 def lit_stalls(obj: Dict[str, Any]) -> List[Dict[str, Any]]:
     sections = obj.get("sections", [])
@@ -210,8 +215,8 @@ def lit_stalls(obj: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 def validate_lit(obj: Dict[str, Any], path: str, cwd: str) -> None:
     if obj.get("schema_version") != "literature-gate-source-fidelity": deny("literature gate JSON requires schema_version == 'literature-gate-source-fidelity'.")
-    mm = re.match(r"^output/literature_gate_(\d{2})\.jsonl$", norm(path))
-    if not mm: deny("literature gate log path must be output/literature_gate_NN.jsonl")
+    mm = re.match(r"^output/literature_gate_(\d{2})(?:_r\d+)?\.jsonl$", norm(path))
+    if not mm: deny("literature gate log path must be output/literature_gate_NN(.jsonl or _rRR.jsonl)")
     nn = mm.group(1)
     if obj.get("lecture") != nn: deny(f"literature gate lecture must be {nn}")
     if not isinstance(obj.get("iter"), int) or obj.get("iter") < 1: deny("iter must be a positive integer.")
@@ -242,6 +247,24 @@ def validate_lit(obj: Dict[str, Any], path: str, cwd: str) -> None:
     if obj["verdict"] == "PASS" and not isinstance(ev.get("checked_claim_ids"), list):
         deny("PASS requires evidence.checked_claim_ids list.")
 
+def gate_append_content(tool: str, ti: Dict[str, Any], old: str) -> str:
+    # A gate log is updated either by Write (content = full new file) or by Edit
+    # (old_string/new_string applied to the current file). For Edit we reconstruct
+    # the resulting file so the SAME exact-prefix + single-new-line validation runs:
+    # this lets a gate append by reproducing only the last line (not the whole log,
+    # which becomes infeasible to hand-transcribe as iterations accumulate), while
+    # append-only is still enforced downstream by appended_obj (the reconstructed
+    # result must keep the old content as an exact prefix and add exactly one line).
+    if tool == "Write":
+        content = ti.get("content")
+        if not isinstance(content, str): deny("gate log Write requires string content.")
+        return content
+    os_, ns_ = ti.get("old_string"), ti.get("new_string")
+    if not isinstance(os_, str) or not isinstance(ns_, str): deny("gate log Edit requires string old_string and new_string.")
+    if not os_: deny("gate log Edit old_string must be non-empty.")
+    if old.count(os_) != 1: deny("gate log Edit old_string must match the current file exactly once.")
+    return old.replace(os_, ns_)
+
 def handle_write(tool: str, ti: Dict[str, Any], agent: str, cwd: str) -> None:
     raw = str(ti.get("file_path", "") or "").strip().replace("\\", "/")
     if not agent or agent == "unknown":
@@ -256,6 +279,8 @@ def handle_write(tool: str, ti: Dict[str, Any], agent: str, cwd: str) -> None:
             deny(f"{tool} to spec/ or template/ is forbidden: {opath}")
         if is_gate(opath):
             deny(f"gate logs are append-only audit artifacts; only the owning gate subagent may write them, not the orchestrator: {opath}")
+        if m("work/**", opath) or m("output/**", opath):
+            deny(f"orchestrator may not directly write agent artifacts: {opath}. All work/** and output/** content is authored by the owning subagent (researcher/theory-curator/tex-writer/typeset-checker/gates) — orchestrate, don't author.")
         allow(f"orchestrator {tool} accepted: {opath}")
     # Subagent tools pass an absolute file_path; normalize it to a project-relative
     # path so ownership/safety checks operate uniformly (the orchestrator branch
@@ -271,21 +296,25 @@ def handle_write(tool: str, ti: Dict[str, Any], agent: str, cwd: str) -> None:
     path = norm(raw)
     if not safe(path): deny(f"unsafe or missing file_path: {path!r}")
     if m("spec/**", path) or m("template/**", path): deny(f"{tool} to spec/ or template/ is forbidden: {path}")
+    # Blank-slate gates carry Write+Edit, but their mutation scope is confined to their
+    # OWN gate log (base or per-round file) — never another gate's log, the .tex, or any
+    # other file. Ownership below already enforces this, but make it explicit and tool-
+    # agnostic (covers both Write and Edit) so the blank-slate boundary is unambiguous.
+    if agent in GATE_LOGS:
+        own = GATE_LOGS[agent]
+        if not re.match(rf"^output/{own}_\d{{2}}(?:_r\d+)?\.jsonl$", path):
+            deny(f"{agent} is a blank-slate gate; {tool} is allowed only on its own output/{own}_NN(.jsonl or _rRR.jsonl), not {path}.")
     owner = None
     for pat, ag in WRITE_OWNERS:
         if m(pat, path): owner = ag; break
     if owner is None: deny(f"No pipeline role owns {tool} target path: {path}")
     require_agent(agent, owner, path)
-    if m("output/gate_log_[0-9][0-9].jsonl", path):
-        if tool != "Write": deny("gate log must be updated by append-style Write, not Edit.")
-        content = ti.get("content")
-        if not isinstance(content, str): deny("gate log Write requires string content.")
-        validate_math(appended_obj(read_old(path, cwd), content, path), path, cwd); allow("math gate JSONL append accepted")
-    if m("output/literature_gate_[0-9][0-9].jsonl", path):
-        if tool != "Write": deny("literature log must be updated by append-style Write, not Edit.")
-        content = ti.get("content")
-        if not isinstance(content, str): deny("literature log Write requires string content.")
-        validate_lit(appended_obj(read_old(path, cwd), content, path), path, cwd); allow("literature gate JSONL append accepted")
+    if re.match(r"^output/(?:read_gate|claim_gate|model_gate)_\d{2}(?:_r\d+)?\.jsonl$", path):
+        old = read_old(path, cwd)
+        validate_gate(appended_obj(old, gate_append_content(tool, ti, old), path), path, cwd); allow("gate JSONL append accepted")
+    if m("output/literature_gate_[0-9][0-9]*.jsonl", path):
+        old = read_old(path, cwd)
+        validate_lit(appended_obj(old, gate_append_content(tool, ti, old), path), path, cwd); allow("literature gate JSONL append accepted")
     allow(f"{tool} path ownership accepted")
 
 def parse(command: str) -> List[str]:
@@ -312,7 +341,7 @@ def is_log(p): return bool(re.match(r"^output/lecture\d{2}\.log$", norm(p)))
 def is_build_log(p): return bool(re.match(r"^output/build/lecture\d{2}_round\d{2}/lecture\d{2}\.log$", norm(p)))
 def is_build_pdf(p): return bool(re.match(r"^output/build/lecture\d{2}_round\d{2}/lecture\d{2}\.pdf$", norm(p)))
 def is_report(p): return bool(re.match(r"^output/typeset_check_\d{2}(?:_round\d{2})?\.md$", norm(p))) or bool(re.match(r"^output/final_pdftotext_check_\d{2}\.md$", norm(p)))
-def is_gate(p): return bool(re.match(r"^output/(?:gate_log|literature_gate)_\d{2}\.jsonl$", norm(p)))
+def is_gate(p): return bool(re.match(r"^output/(?:gate_log|literature_gate|read_gate|claim_gate|model_gate)_\d{2}(?:_r\d+)?\.jsonl$", norm(p)))
 
 def check_sha(argv: List[str]) -> None:
     if argv[0] != "sha256sum" or len(argv) < 2: deny("sha256sum requires paths.")
@@ -378,22 +407,23 @@ def check_typeset(argv: List[str]) -> None:
     deny(f"Bash command not allowed for typeset-checker: {cmd}")
 
 def handle_read(ti: Dict[str, Any], agent: str, cwd: str) -> None:
-    # Only mathematician-gate is restricted; every other agent's Read falls through.
-    if agent != "mathematician-gate":
+    # Only the three blank-slate gates are restricted; every other agent's Read falls through.
+    if agent not in GATE_LOGS:
         return
+    own = GATE_LOGS[agent]  # e.g. "read_gate"
     raw = str(ti.get("file_path", "") or "").strip().replace("\\", "/")
     if raw.startswith("/"):
         try:
             rel = Path(raw).resolve().relative_to(Path(cwd).resolve())
             raw = "/".join(rel.parts)
         except Exception:
-            deny(f"mathematician-gate Read path is absolute and escapes project root: {raw!r}")
+            deny(f"{agent} Read path is absolute and escapes project root: {raw!r}")
     path = norm(raw)
     if not safe(path):
-        deny(f"mathematician-gate unsafe Read path: {path!r}")
-    if MATH_READ_RE.match(path):
-        allow(f"mathematician-gate Read whitelisted: {path}")
-    deny(f"mathematician-gate may not Read {path}. Allowed only: output/lecture<NN>.tex and its own output/gate_log_<NN>.jsonl. (theory.md, typeset report, spec/, research.md, other logs, .claude/ are all blocked — blank-slate auditor. Use sha256sum, not Read, for theory/typeset digests.)")
+        deny(f"{agent} unsafe Read path: {path!r}")
+    if re.match(r"^output/lecture\d{2}\.tex$", path) or re.match(rf"^output/{own}_\d{{2}}(?:_r\d+)?\.jsonl$", path):
+        allow(f"{agent} Read whitelisted: {path}")
+    deny(f"{agent} may Read only output/lecture<NN>.tex and its own output/{own}_<NN>.jsonl. (theory.md, typeset report, spec/, research.md, other gates' logs, .claude/ all blocked — blank-slate auditor. Use sha256sum, not Read, for digests.)")
 
 
 def handle_bash(ti: Dict[str, Any], agent: str) -> None:
@@ -411,7 +441,7 @@ def handle_bash(ti: Dict[str, Any], agent: str) -> None:
         deny(f"orchestrator Bash restricted to sha256sum/mkdir/ls/py_compile; got {cmd!r}.")
     argv = parse(ti.get("command", ""))
     if agent == "typeset-checker": check_typeset(argv); allow("typeset-checker Bash command accepted")
-    if agent in {"mathematician-gate", "literature-gate"}:
+    if agent in {"read-gate", "claim-gate", "model-gate", "literature-gate"}:
         if argv[0] != "sha256sum": deny(f"{agent} may use Bash only for sha256sum.")
         check_sha(argv); allow(f"{agent} sha256sum accepted")
     deny(f"Bash is not allowed for agent {agent}.")

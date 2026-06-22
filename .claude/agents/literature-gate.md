@@ -4,7 +4,7 @@ description: >
   source-fidelity 감사자. dossier mode에서는 theory.md가 원문보다 강한지 검사하고,
   lecture mode에서는 lecture.tex가 theory.md보다 강한지 검사한다.
   output/literature_gate_NN.jsonl에 append-only JSONL 판정을 남긴다.
-tools: Read, Write, WebSearch, WebFetch, Bash, Glob
+tools: Read, Write, Edit, WebSearch, WebFetch, Bash, Glob
 model: opus
 permissionMode: dontAsk
 maxTurns: 140
