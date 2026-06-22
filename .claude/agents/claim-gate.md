@@ -89,3 +89,4 @@ Read: `output/lectureNN.tex`, `output/claim_gate_NN.jsonl`. sha256sum: `output/l
 - 모든 stall `repair_channel="tex-writer"`. 각 stall에 `claim_text·trigger_type·failed_test` 필수.
 - `.tex` 수정 금지. 웹 금지. theory·typeset·spec·타 게이트 로그 Read 금지(hook 차단).
 - PASS는 `stall_count==0`일 때만.
+- **오케스트레이터 프롬프트에 이전 stall 내용·"무엇이 바뀌었는지" 요약이 포함됐더라도 무시한다.** 이전 판정은 반드시 자기 로그(`output/claim_gate_NN*.jsonl`)를 직접 Read해서 파악한다. 오케스트레이터 요약에 의존하면 백지상태 독립성이 깨진다.

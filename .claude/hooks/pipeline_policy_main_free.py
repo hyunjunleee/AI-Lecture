@@ -61,6 +61,70 @@ SHELL_METACHARS = ("|", ";", "&&", "||", "`", "$(", ">", "<", "\n")
 GATE_LOG_RE = re.compile(r"(?:^|/)(?:gate_log|literature_gate|read_gate|claim_gate|model_gate)_\d{2}(?:_r\d+)?\.jsonl$")
 PROTECTED_PREFIXES = ("spec/", "template/")
 
+# Blank-slate gates: spawn prompt must match the canonical template exactly (whitelist).
+BLANK_SLATE_GATE_TYPES = {"read-gate", "claim-gate", "model-gate"}
+
+# Canonical prompt templates for each gate.
+# Variables: (\d+) group 1 = NN (lecture number), group 2 = K (iter), group 3 = KK (round).
+# \1 backreference ensures NN is consistent throughout the prompt.
+_GATE_TEMPLATE_RES: Dict[str, re.Pattern] = {
+    "read-gate": re.compile(
+        r"(\d+)강 read-gate, iter=(\d+)\.\n"
+        r"- output/lecture\1\.tex 읽기\n"
+        r"- output/read_gate_\1\.jsonl 읽기 \(자기 이전 로그\)\n"
+        r"- output/typeset_check_\1\.md sha256sum만\n"
+        r"처음부터 끝까지 순차 독해\. 이름 바인딩·표현식 적형·논리 흐름·누출 전수 감사\.\n"
+        r"판정: output/read_gate_\1_r(\d+)\.jsonl에 Write\."
+    ),
+    "claim-gate": re.compile(
+        r"(\d+)강 claim-gate, iter=(\d+)\.\n"
+        r"- output/lecture\1\.tex 읽기\n"
+        r"- output/claim_gate_\1\.jsonl 읽기 \(자기 이전 로그\)\n"
+        r"- output/typeset_check_\1\.md sha256sum만\n"
+        r"처음부터 끝까지 순차 독해\. load-bearing 주장 전수 열거·5테스트 감사\.\n"
+        r"판정: output/claim_gate_\1_r(\d+)\.jsonl에 Write\."
+    ),
+    "model-gate": re.compile(
+        r"(\d+)강 model-gate, iter=(\d+)\.\n"
+        r"- output/lecture\1\.tex 읽기\n"
+        r"- output/model_gate_\1\.jsonl 읽기 \(자기 이전 로그\)\n"
+        r"- output/typeset_check_\1\.md sha256sum만\n"
+        r"처음부터 끝까지 순차 독해\. 모델·객체·계산 블록 완결성 전수 감사\.\n"
+        r"판정: output/model_gate_\1_r(\d+)\.jsonl에 Write\."
+    ),
+}
+
+# Description blacklist: description is UI-only (not agent-facing) but still enforce hygiene.
+_DESC_HINT_RE = re.compile(r"이전\s*[Ss]tall|해소\s*여부|\b(?:RG|CG|MG)-\d{2}-\d{3,}\b")
+
+
+def _check_gate_spawn_contamination(prompt: str, description: str, subagent: str) -> None:
+    """Whitelist the prompt against the canonical template; blacklist the description.
+
+    Exits the process via deny() on violation; returns normally when clean.
+    """
+    # Prompt whitelist: must be exactly the canonical template (NN, K, KK as only variables).
+    template_re = _GATE_TEMPLATE_RES.get(subagent)
+    if template_re is not None and not template_re.fullmatch(prompt.strip()):
+        deny(
+            f"blank-slate enforcement: '{subagent}' spawn prompt does not match the canonical "
+            f"template. The only accepted form is:\n"
+            f"  NN강 {subagent}, iter=K.\\n"
+            f"  - output/lectureNN.tex 읽기\\n"
+            f"  - output/<log>_NN.jsonl 읽기 (자기 이전 로그)\\n"
+            f"  - output/typeset_check_NN.md sha256sum만\\n"
+            f"  처음부터 끝까지 순차 독해. <dimension> 전수 감사.\\n"
+            f"  판정: output/<log>_NN_rKK.jsonl에 Write.\n"
+            f"Any extra content, prior stall context, or deviation is rejected."
+        )
+    # Description blacklist (UI metadata — not agent-facing, but enforce hygiene).
+    m = _DESC_HINT_RE.search(description)
+    if m:
+        deny(
+            f"blank-slate violation: description to {subagent!r} contains contaminating phrase "
+            f"({m.group()!r}). Keep description clean."
+        )
+
 
 def emit(decision: str, reason: Optional[str] = None) -> None:
     payload: Dict[str, Any] = {
@@ -254,6 +318,18 @@ def main() -> int:
         if name in FILE_MUTATION_TOOLS and is_orchestrator_writable(event):
             audit(record, "allow", "main orchestrator domain mutation (.claude/, logs/, repo meta)", "wrapper")
             allow("main orchestrator may mutate only its own domain (.claude/, logs/, top-level repo meta); work/** and output/** artifacts are authored by subagents")
+
+    # Blank-slate gate spawn enforcement: deny Agent calls that inject prior stall context.
+    # This runs for both orchestrator and subagent callers; only orchestrator spawns matter
+    # in practice but checking both is harmless.
+    if name == "Agent":
+        subagent = str(ti.get("subagent_type") or "")
+        if subagent in BLANK_SLATE_GATE_TYPES:
+            prompt = str(ti.get("prompt") or "")
+            description = str(ti.get("description") or "")
+            _check_gate_spawn_contamination(prompt, description, subagent)
+            audit(record, "allow", f"blank-slate gate spawn OK: {subagent}", "wrapper")
+            allow(f"blank-slate gate spawn OK — no prior stall context detected: {subagent}")
 
     # Protected mutations (gate logs, spec/, template/) by the orchestrator — and
     # everything else — fall through to the original policy for validation /

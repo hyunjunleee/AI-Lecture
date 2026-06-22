@@ -130,6 +130,7 @@ N강 요청을 받으면 아래 순서로 실행한다.
    input: output/lectureNN.tex (각 게이트는 자기 로그만 추가 Read; typeset_report는 sha256sum)
    output append: output/read_gate_NN.jsonl / output/claim_gate_NN.jsonl / output/model_gate_NN.jsonl
    required: 세 게이트 모두 current lecture.tex(+typeset_report) digest에 묶인 PASS
+   spawn 프롬프트: 반드시 §5.3.1 표준형 사용 (첫 실행·재실행 모두 동일, hook 강제)
 
 7. literature-gate, mode=lecture
    input: output/lectureNN.tex + work/lectureNN_theory.md + work/lectureNN_research.md + 원문
@@ -255,6 +256,55 @@ tex-writer가 output/{read,claim,model}_gate_NN.jsonl 마지막 FAIL line의 sta
 ```
 
 세 게이트는 "theory가 부족하다/새 source가 필요하다"를 판정하지 않는다(theory.md를 보지도 못한다). 그 판단은 §5.5에서 tex-writer가 한다.
+
+#### 5.3.1 게이트 spawn 프롬프트 표준형 (첫 실행·재실행 공통, 오케스트레이터 의무 + hook 강제)
+
+**오케스트레이터는 게이트를 재실행할 때 이전 stall 내용·수정 내용·"무엇이 바뀌었는지"를 프롬프트에 포함하지 않는다.** 게이트는 자기 로그를 직접 읽어 이전 판정을 파악한다. 오케스트레이터가 힌트를 주면 감사 독립성이 깨진다.
+
+올바른 게이트 재실행 프롬프트 (최소 형태):
+
+```text
+NN강 {read|claim|model}-gate, iter=K.
+- output/lectureNN.tex 읽기 (변경됨, sha256: <현재 hash>)
+- output/{read|claim|model}_gate_NN.jsonl 또는 _rRR.jsonl 읽기 (자기 이전 로그)
+- output/typeset_check_NN.md sha256sum만
+처음부터 끝까지 순차 독해. {게이트별 차원} 전수 감사.
+판정: output/{read|claim|model}_gate_NN_rKK.jsonl에 Write.
+```
+
+**`pipeline_policy_main_free.py`가 `Agent` 도구 호출을 intercept해 prompt가 아래 표준형과 정확히 일치하지 않으면 deny한다 (whitelist).** 변수는 `NN`(강 번호)·`K`(iter)·`KK`(라운드) 세 개뿐이고, 동일 `NN`이 모든 줄에 일관됨을 `\1` backreference로 검증한다.
+
+**read-gate 표준형:**
+```
+NN강 read-gate, iter=K.
+- output/lectureNN.tex 읽기
+- output/read_gate_NN.jsonl 읽기 (자기 이전 로그)
+- output/typeset_check_NN.md sha256sum만
+처음부터 끝까지 순차 독해. 이름 바인딩·표현식 적형·논리 흐름·누출 전수 감사.
+판정: output/read_gate_NN_rKK.jsonl에 Write.
+```
+
+**claim-gate 표준형:**
+```
+NN강 claim-gate, iter=K.
+- output/lectureNN.tex 읽기
+- output/claim_gate_NN.jsonl 읽기 (자기 이전 로그)
+- output/typeset_check_NN.md sha256sum만
+처음부터 끝까지 순차 독해. load-bearing 주장 전수 열거·5테스트 감사.
+판정: output/claim_gate_NN_rKK.jsonl에 Write.
+```
+
+**model-gate 표준형:**
+```
+NN강 model-gate, iter=K.
+- output/lectureNN.tex 읽기
+- output/model_gate_NN.jsonl 읽기 (자기 이전 로그)
+- output/typeset_check_NN.md sha256sum만
+처음부터 끝까지 순차 독해. 모델·객체·계산 블록 완결성 전수 감사.
+판정: output/model_gate_NN_rKK.jsonl에 Write.
+```
+
+글자 하나라도 추가하거나 빠지면 deny. description에 stall ID·"이전 stall"·"해소 여부"가 있어도 deny.
 
 ### 5.4 literature-gate lecture FAIL
 
