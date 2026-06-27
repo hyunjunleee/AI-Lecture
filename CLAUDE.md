@@ -34,7 +34,7 @@ read/claim/model gate  = lecture.tex 내부 수학 전수 감사 (백지상태, 
 
 내부 수학 감사는 **3개의 백지상태 게이트**로 분리한다 — `read-gate`(무정지 순차 독해: 이름·적형·흐름·누출), `claim-gate`(load-bearing 주장 적대적 5테스트), `model-gate`(구체 모델·계산 완결성: 객체 before 부분, §2.16 4요소). 각 게이트는 `output/lectureNN.tex`와 *자기* gate log 외에는 아무것도 읽지 못한다(theory.md·typeset·spec·서로의 로그 전부 hook 차단). 매 iteration 백지 순차 재독해하고, **모든 stall을 `repair_channel=tex-writer`로만 보낸다**. 웹 검색하지 않는다. (단일 게이트가 8개 차원을 한 번에 점검하다 반복해서 놓친 것이 분리의 계기 — 설계: `.claude/policy/redesign_gate_split.md`.)
 
-추가 자료조사·theory 보강이 필요한지의 **판단은 항상 `tex-writer`가 한다**. tex-writer가 게이트/literature stall을 받아 ① 내부 보강으로 해결하거나 ② `theory-curator`/`researcher`에 escalation 요청을 낸다(§5.5). 즉 자료조사 진입점은 tex-writer 단일화다.
+추가 자료조사·theory 보강이 필요한지의 **판단은 항상 `tex-writer`가 한다**. tex-writer가 게이트/literature stall을 받아 ① 내용을 추가하는 방향의 fix로 해결하거나(claim-gate stall의 약화·삭제는 §5.3.2 조건 충족 필수) ② `theory-curator`/`researcher`에 escalation 요청을 낸다(§5.5). 즉 자료조사 진입점은 tex-writer 단일화다.
 
 ---
 
@@ -250,7 +250,7 @@ tex-writer가 output/typeset_check_NN.md와 round report를 읽고 output/lectur
 
 ```text
 tex-writer가 output/{read,claim,model}_gate_NN.jsonl 마지막 FAIL line의 stall을 모두 읽고,
-각 stall을 ① 내부 보강(정의·기호·논리·계산 적법성·표기)으로 직접 해결하거나,
+각 stall을 ① 내용을 추가하는 방향의 fix(정의·기호·논리·계산 적법성·표기)로 직접 해결하거나(claim-gate stall의 약화·삭제는 §5.3.2 조건 필요),
 ② theory.md로는 자의적 보충 없이 못 쓰는 경우 §5.5 escalation을 낸다.
 → lecture.tex 변경 시 typeset-checker부터 재시작.
 ```
@@ -305,6 +305,23 @@ NN강 model-gate, iter=K.
 ```
 
 글자 하나라도 추가하거나 빠지면 deny. description에 stall ID·"이전 stall"·"해소 여부"가 있어도 deny.
+
+#### 5.3.2 claim-gate stall — 약화·삭제 시 claim_id 의무
+
+claim-gate stall에 대해 tex-writer가 **약화(weaken)·삭제(remove)·산문 회피**로 처리하려면 다음 두 조건이 모두 충족돼야 한다:
+
+(a) theory.md에 해당 claim의 `claim_id`가 있고,  
+(b) 그 claim card(`semantic_boundary` / `non-entailments` / `use_grade`)가 약화된 형태만 support하되 원래 형태는 support하지 않음이 명시됨.
+
+둘 중 하나라도 없으면 **§5.5 escalation 의무** — 약화·삭제로 stall을 닫지 않는다.  
+내용을 *추가*하는 방향의 fix(정의 보충·파생 추가·인용 삽입)는 기존과 동일하게 내부 수정 기본.
+
+tex-writer는 **claim-gate FAIL로 인한 재집필 후** 최종 메시지에 REVISION_MANIFEST를 포함한다(형식: `tex-writer.md §7.2`). 오케스트레이터는 claim-gate FAIL로 tex-writer를 호출한 경우에 한해, 반환 메시지의 REVISION_MANIFEST를 확인한 뒤 아래 순서로 처리한다:
+
+- `approach: escalation` 항목이 있으면 → §5.5 라우팅 먼저 진행, typeset-checker 보류. escalation 해소 후 §6 invalidation을 확인한 뒤 재개(다른 `internal_fix` 항목이 있어도 theory.md 변경이 선행하면 tex-writer 재집필이 필요할 수 있으므로 typeset-checker를 먼저 호출하지 않는다).
+- `approach: claim_weakened|claim_removed` + `claim_id: none` → escalation 강제 전환 (typeset-checker 호출 안 함)
+- `approach: claim_weakened|claim_removed` + `claim_id: S?-C?` → 오케스트레이터가 theory.md 해당 claim card의 `non-entailments`/`semantic_boundary`를 Read해 근거 확인
+- 그 외(`approach: internal_fix`만 있으면) → typeset-checker 호출
 
 ### 5.4 literature-gate lecture FAIL
 
@@ -526,11 +543,65 @@ E. final pdftotext gate PASS
 - **독자에게 보이는 출처는 본문 문장 속 실제 서지 인용** — `\cite{key}`로 참고문헌 항목을 가리켜 `[n]` 번호 + 저자·연도로 렌더한다(사양서 §2.8 author-year 정책). theory dossier의 내부 식별자(`S1-C1` 같은 `source_id-claim_id`)는 **독자에게 노출하지 않는다**. 그 claim_id는 기계 추적용 LaTeX 주석(`% source_claim: S1-C1`)으로만 남긴다. 즉 독자는 본문 산문 속 `[n]`(저자, 연도)를 보고, 게이트는 주석의 `Sx-Cy`로 추적한다.
 - `S<숫자>-C<숫자>` 같은 내부 claim_id나 사양서 절 표시(§2.6A-5 류)가 독자용 본문·remark 제목에 나타나면 안 된다(누출). typeset-checker가 기계 검출, read-gate가 의미 검출한다.
 - **본문은 대학 전공 수학 교과서의 연속 산문이다.** 강의노트·슬라이드식 파편화, 개조식 나열(키워드 박스), 메타-서술 라벨(`비고[문헌 의존성]`·"black-box"·`[epistemic:]`·"강의 내부 논증") 금지. 새 장·절·정리는 직전 한계→도입 필요성을 잇는 **도입 브릿지 산문**으로 시작하고, 출처는 본문 문장 속 **인라인 인용**으로 녹인다. 메타 라벨이 담던 *내용*(귀속·증명생략·경험적 표시)은 자연스러운 문장으로 흡수한다. tex-writer §5A 작성, read-gate §6.2·typeset-checker 메타 grep가 QA. (사양서 §2.6A "형식 자유"와 양립 — 형식만 바꾸고 내용 의무는 유지.)
-- **개념 도입 근거는 빠뜨리지 않되 지어내지 않는다.** 각 핵심 개념·결과는 ① 필연성·동기(직전 한계 → 왜 필요), ② 앞 개념·대안 대비 비교·트레이드오프(기준·측정 양), ③ 유의성(왜 중요한 결과), ④ **공학적·운영적 직관**(그 대상이 실제로 무엇을 하는가·왜 이 형태인가·이해 그림 — 원저자 설명에 근거; 휴리스틱이면 `[epistemic:]` 라벨)을 *근거(본문 유도 또는 인용) 있게* 담는다. 또한 컴포넌트를 정의했으면 그것을 쓰는 **전체 모델의 작동 구조**(출력까지의 데이터 흐름·생성 루프 폐쇄)를 보인다. 체인: researcher 수집 → theory-curator 정착(§5 도입 근거 표, 직관 열 포함) → tex-writer 작성(§6.2, 본문 유도/인용 없는 주장·근거 없는 비유 금지) → claim-gate(§6.1a) 무근거 주장 멈춤 + model-gate(§4.3-7) full-model 구조 누락 멈춤 + literature-gate 비교·성능·유의성 fidelity 감사. 근거가 없으면 자의로 채우지 말고 tex-writer가 escalation(§5.5).
+- **개념 도입 근거는 빠뜨리지 않되 지어내지 않는다.** 각 핵심 개념·결과는 ① 필연성·동기(직전 한계 → 왜 필요), ② 앞 개념·대안 대비 비교·트레이드오프(기준·측정 양), ③ 유의성(왜 중요한 결과), ④ **공학적·운영적 직관**(그 대상이 실제로 무엇을 하는가·왜 이 형태인가·이해 그림 — 원저자 설명에 근거; 휴리스틱이면 `[epistemic:]` 라벨)을 *근거(본문 유도 또는 인용) 있게* 담는다. 또한 컴포넌트를 정의했으면 그것을 쓰는 **전체 모델의 작동 구조**(출력까지의 데이터 흐름·생성 루프 폐쇄)를 보인다. **중심·load-bearing 방법에는 — 모두 근거(유도·인용·라벨된 empirical)가 있을 때만, 없으면 escalation/생략하고 지어내지 않으며 — ⓐ 손실/목적함수·update/fixed-point, ⓑ 효과 ↔ 한계·실패모드(언제 깨지나, 균형), ⓒ 이론적 렌즈(들)와 '어디까지 맞고 어디서 깨지나', ⓓ 현대 모델 쓰임(empirical+출처), ⓔ open problems(진술 출처)를 본문 연속 산문에 담는다(별도 비교표·박스·개조식 금지).** 직관·비유는 자작하지 않고 특정 reference에 등장할 때 그 형태를 손상·강화 없이 충실히 옮길 때만 쓴다. ⓐⓑⓒ는 중심 방법에 의무(근거 있을 때), ⓓⓔ·직관은 권장(근거 있을 때). 체인: researcher 수집 → theory-curator 정착(§5 도입 근거 표 + §6 완결 표, 근거 있을 때만) → tex-writer 작성(§6.2, 본문 유도/인용 없는 주장·근거 없는 비유 금지) → claim-gate(§6.1a) 무근거 주장 멈춤 + model-gate(§4.3-7) full-model 구조 누락 멈춤 + literature-gate 비교·성능·유의성·empirical·렌즈 fidelity 감사. 근거가 없으면 자의로 채우지 말고 tex-writer가 escalation(§5.5).
 
 ---
 
-## 12. 권위 문서 위치
+## 12. 오케스트레이터 가용 도구 목록
+
+hook(`pipeline_policy_main_free.py` → `pipeline_policy.py`)이 강제하는 실제 경계다. "설정에 있다"와 "hook이 통과시킨다"는 다르다 — 아래가 실질적 사용 가능 목록이다.
+
+### 12.1 제한 없이 사용 가능
+
+| 도구 | 범위 | 비고 |
+|---|---|---|
+| `Read` | 모든 파일 | spec/, work/, output/ 포함 — 파일 존재 확인도 Read로 |
+| `Glob` | 모든 패턴 | |
+| `Grep` | 모든 패턴·경로 | |
+| `Agent` | 모든 에이전트 | blank-slate gate(read/claim/model)는 §5.3.1 표준형 강제 |
+
+### 12.2 쓰기 제한 (Write / Edit / MultiEdit)
+
+**허용:** `.claude/**`, `logs/**`, 최상위 repo 메타 파일(CLAUDE.md, .gitignore 등 — 경로에 `/` 없음)
+
+**금지:** `work/**`, `output/**`, `spec/**`, `template/**`, gate log(`*_gate_NN*.jsonl`)
+
+### 12.3 Bash — 4개 명령만, 상대경로만
+
+```text
+Bash(sha256sum <rel>)         # pipeline 파일 상대경로만
+                               # 허용: work/lectureNN_*.md, output/lectureNN.tex,
+                               #        output/lectureNN.pdf, output/typeset_check_NN*.md 등
+Bash(mkdir -p <rel>)          # 안전한 상대경로
+Bash(ls <rel>)                # 안전한 상대경로 (절대경로 불가!)
+Bash(python3 -m py_compile)   # 문법 검사
+```
+
+**메타문자 전면 금지:** `|`, `;`, `&&`, `||`, `` ` ``, `$(`, `>`, `<`, `\n`  
+**절대경로 금지:** `/home/...` 형태는 `safe()` 검사에서 deny  
+→ 파일 목록 확인은 `Bash(ls work/)` `Bash(ls output/)` — 상대경로로
+
+### 12.4 사용 불가
+
+- `WebSearch`, `WebFetch` — 오케스트레이터(agent_type 미설정)는 fail-closed로 deny
+- `Bash` 4개 외 모든 명령 (`find`, `grep`, `cat`, `python3 script.py` 등)
+- 파이프·리다이렉트 (`ls output/ | grep "15"` → `|` 즉시 deny)
+
+### 12.5 강의 시작 절차
+
+```text
+1. Read(spec/AI_curriculum_28강.md)       # 강의 주제 확인 — Bash find/ls 불필요
+2. Read(work/lectureNN_research.md)       # 기존 파일 확인: 없으면 오류 반환
+   또는 Bash(ls work/)                    # 상대경로로 디렉터리 목록
+3. 라운드 배너 출력 (§8)
+4. Agent(researcher) 실행                 # 신규 강의면 곧바로
+```
+
+**핵심:** 파일 존재 확인 = `Read` 시도(오류=없음). `find`, 절대경로 `ls`, 파이프는 hook에서 즉시 차단된다.
+
+---
+
+## 13. 권위 문서 위치
 
 ```text
 spec/AI28_강의제작_사양서_v13-2.md

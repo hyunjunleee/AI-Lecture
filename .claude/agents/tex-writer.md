@@ -194,7 +194,7 @@ comment-only source tag는 machine trace로만 사용한다. 독자에게 보이
 
 **일반 규칙 — 본문 유도 또는 인용 없는 주장은 쓰지 않는다.** 모든 load-bearing 주장은 (a) *본문에서 앞 내용으로부터 유도*되거나 (b) `theory.md`의 `claim_id`(또는 context면 `research.md`)에 근거해야 한다. 이는 증명 단계뿐 아니라 **정성·비교·인과·유의성 주장**에도 똑같이 적용된다 — "더 효율적이다 / 메모리를 덜 쓴다 / ~때문에 등장했다 / 중요한 결과다" 류를 유도도 인용도 없이 단정하지 않는다. 비교 주장이면 비교 기준과 측정 양도 함께 적는다. 근거가 없으면 쓰지 말고 §7.5로 escalate한다(claim-gate가 무근거 주장을 멈춤으로 잡는다).
 
-### 6.2 개념 도입의 동기·필연성·유의성·공학적 직관 (놓치지 말 것)
+### 6.2 개념 도입의 동기·필연성·유의성·공학적 직관 + 방법 완결 항목 (놓치지 말 것)
 
 강의가 어떤 개념·결과를 도입할 때, 그것이 *왜 그 자리에 나올 수밖에 없었는지*를 빠뜨리지 않는다 — 단 §6.1대로 **근거(유도 또는 인용) 있게**. 각 도입 개념에 대해, 가능한 한 다음을 근거와 함께 담는다:
 
@@ -202,6 +202,15 @@ comment-only source tag는 machine trace로만 사용한다. 독자에게 보이
 - **비교/트레이드오프**: 앞 개념·대안 대비 무엇을 얻고 무엇을 잃는가(비용·표현력·자원 등). 비교에는 *무엇 대비, 어떤 양으로* 측정하는지 명시.
 - **유의성**: 왜 강의에 넣을 만큼 중요한 결과·개념인가.
 - **공학적·운영적 직관**: 그 대상·메커니즘이 *실제로 무엇을 하는가*(작동상 효과)·*왜 이런 형태인가*(설계 직관)·*어떤 그림으로 이해하면 되는가*. 형식 정의 옆에 그 대상의 "느낌"을 한두 문장 둔다 — 예: forget gate가 1에 가까우면 셀이 과거를 보존한다(기억의 보존 통로), additive cell-path가 gradient를 손실 없이 흘려보낸다, attention 가중치가 디코더의 "어디를 볼지" 선택을 구현한다. **단 §6.1 적용** — 이 직관도 `theory.md`/`research.md`의 원저자 동기·설명이나 본문 유도에 *근거*해야 하고, 휴리스틱·경험적이면 `[epistemic: …]`로 표시한다(직관을 정리·보장으로 위장 금지). **근거 없이 지어낸 비유·직관은 금지** — 적절한 직관 재료가 dossier에 없으면 §7.5 escalation으로 theory-curator에 요청한다.
+
+**중심·load-bearing 방법에는 다음 완결 항목도 담는다(theory.md §6 완결 표가 재료).** 단 **모두 §6.1 적용 — 근거(유도·인용·라벨된 empirical)가 있을 때만**, 없으면 §7.5 escalation 또는 생략, *절대 지어내지 않는다*. 전부 **본문 연속 산문에 녹이고**, 표·박스·개조식으로 쪼개지 않으며 별도 비교표를 만들지 않는다.
+
+- **손실/목적함수 (의무)**: 그 방법의 loss·objective·update equation·fixed-point을 한 번은 수식으로 드러내고 각 항의 의미를 해석한다.
+- **효과 ↔ 한계·실패모드 (의무)**: 무엇을 개선하는가(성능·효율·안정성·표현력 — empirical이면 출처+라벨)와 *언제 깨지나/무엇을 못 푸나*를 **함께** 쓴다(홍보 금지, 균형). "강력하다/효율적이다/좋다" 류 금지 — 어떤 metric·복잡도·objective·안정성·inductive bias가 달라지는지로 말한다.
+- **이론적 렌즈 + 경계 (의무)**: 그 방법을 이해하는 이론적 관점(에너지·확률·최적화·정보이론·커널 등 *주제에 맞는 것*)과 *그 해석이 어디까지 맞고 어디서 깨지는지*를 명시한다(7강 Hopfield 에너지·NW 커널 렌즈가 예시).
+- **현대 모델 쓰임 (권장)**: 실제 foundation model·task·benchmark에서의 쓰임 — empirical+출처+라벨.
+- **open problems (권장)**: 아직 이론·실험적으로 미해결인 것 — *그 미해결을 진술한 출처*에 근거.
+- **직관·비유 (권장, C2)**: 직관적 해석·비유는 특정 reference(논문·강의자료)에 등장할 때, 그 reference의 형태를 *손상·강화하지 않고 충실히* 옮기는 한에서만 넣는다. 자작 비유 금지.
 
 이들은 전부 load-bearing 주장이다(§6.1 적용). 근거가 `theory.md`/`research.md`에 없으면 자의로 채우지 말고 §7.5 escalation으로 theory-curator/researcher에 요청한다. 반대로, 동기를 *아예 적지 않고* 개념만 정의하고 넘어가는 것도 무정지 서사의 결함이다 — 근거 있는 동기 한 줄이라도 둔다(empirical 비교면 그 라벨과 함께).
 
@@ -218,8 +227,24 @@ comment-only source tag는 machine trace로만 사용한다. 독자에게 보이
 
 세 게이트 로그 — `output/read_gate_NN.jsonl`·`output/claim_gate_NN.jsonl`·`output/model_gate_NN.jsonl` — 의 마지막 FAIL line stall을 모두 읽는다. 세 게이트의 모든 stall은 `repair_channel=tex-writer`다 — 즉 전부 너에게 온다. 세 게이트는 백지상태 독자라 theory.md를 보지 못하므로, stall은 "이 지점에서 막힌다"는 사실만 말한다. 각 stall에 대해 너가 판단한다:
 
-- **내부 보강으로 해결 가능**(정의 누락·기호 미바인딩·계산 적법성 산문·표기 정합·논리 도약·도입 브릿지·객체 before 부분): 직접 `Edit`/`Write`로 고친다. 단 §6.1 — 없는 내용을 지어내지 않는다.
+- **내용을 추가하는 방향의 fix**(정의 누락·기호 미바인딩·계산 적법성 산문·표기 정합·논리 도약·도입 브릿지·객체 before 부분): 직접 `Edit`/`Write`로 고친다. 단 §6.1 — 없는 내용을 지어내지 않는다.
 - **theory.md만으로는 자의적 보충 없이 못 고침**(증명 단계가 claim card에 없음, claim card가 얕음, 새 source 필요): 추측으로 메우지 말고 **§7.5 escalation을 낸다**.
+
+**claim-gate stall — 약화·삭제 제한 (CLAUDE.md §5.3.2)**:  
+claim-gate stall에 대해 약화(weaken)·삭제(remove)·산문 회피로 처리하려면 다음 두 조건 모두 충족:  
+(a) theory.md에 해당 `claim_id`가 있고,  
+(b) 그 claim card(`semantic_boundary` / `non-entailments` / `use_grade`)가 약화된 형태만 support하되 원래 형태는 support하지 않음이 명시.  
+하나라도 없으면 §7.5 escalation 의무 — 약화·삭제로 stall을 닫지 않는다.
+
+**claim-gate FAIL로 인한 재집필 후**, 최종 메시지에 아래 형식으로 REVISION_MANIFEST를 포함한다. stall이 여러 개면 각각 한 항목씩. read/model gate stall은 항목 생략 가능(claim-gate stall만 필수).
+
+```text
+REVISION_MANIFEST:
+- stall_id: CLAIM-NN-RR-001
+  approach: internal_fix | claim_weakened | claim_removed | escalation
+  claim_id: S?-C?            # 없으면 "none"
+  why_not_escalation: …      # approach가 claim_weakened / claim_removed 일 때만
+```
 
 ### 7.3 literature lecture FAIL
 
